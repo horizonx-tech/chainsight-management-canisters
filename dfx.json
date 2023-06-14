@@ -1,17 +1,34 @@
 {
+  "version": 1,
   "canisters": {
-    "proxy": {
-      "candid": "src/proxy/proxy.did",
-      "package": "proxy",
-      "type": "rust"
+    "indexRegistry": {
+      "type": "motoko",
+      "main": "src/registry/IndexRegistry.mo",
+      "declarations": {
+        "node_compatibility": true
+      }
+    },
+    "indexService": {
+      "type": "motoko",
+      "main": "src/registry/IndexService.mo",
+      "declarations": {
+        "node_compatibility": true
+      }
     }
+  },
+  "declarations": {
+    "output": "src/declarations"
   },
   "defaults": {
     "build": {
-      "args": "",
-      "packtool": ""
+      "packtool": "vessel sources",
+      "args": ""
     }
   },
-  "output_env_file": ".env",
-  "version": 1
+  "networks": {
+    "local": {
+      "bind": "127.0.0.1:8000",
+      "type": "ephemeral"
+    }
+  }
 }

@@ -10,7 +10,7 @@ import Utils "mo:candb/Utils";
 import Buffer "mo:stable-buffer/StableBuffer";
 import IndexService "./IndexService";
 
-shared ({ caller = owner }) actor class IndexCanister() = this {
+shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
     /// @required stable variable (Do not delete or change)
     ///
     /// Holds the CanisterMap of PK -> CanisterIdList
@@ -25,9 +25,12 @@ shared ({ caller = owner }) actor class IndexCanister() = this {
         getCanisterIdsIfExists(pk);
     };
 
-    public shared query ({ caller = caller }) func listCanisters(pk : Text) : async [Text] {
-        let canisterId = getCanisterIdsIfExists(pk);
-        { [] };
+    public shared (msg) func init() : async [?Text] {
+        assert (owner == msg.caller);
+        ([
+            await createServiceCanister("Canisters"),
+            await createServiceCanister("Logs"),
+        ]);
     };
 
     /// @required function (Do not delete or change)
@@ -41,22 +44,22 @@ shared ({ caller = owner }) actor class IndexCanister() = this {
         };
     };
 
-    public shared ({ caller = caller }) func autoScaleHelloServiceCanister(pk : Text) : async Text {
+    public shared (msg) func autoScaleServiceCanister(pk : Text) : async Text {
+        assert (owner == msg.caller);
         // Auto-Scaling Authorization - if the request to auto-scale the partition is not coming from an existing canister in the partition, reject it
-        if (Utils.callingCanisterOwnsPK(caller, pkToCanisterMap, pk)) {
+        if (Utils.callingCanisterOwnsPK(owner, pkToCanisterMap, pk)) {
             Debug.print("creating an additional canister for pk=" # pk);
-            await createHelloServiceCanister(pk, ?[owner, Principal.fromActor(this)]);
+            await _createServiceCanister(pk, ?[owner, Principal.fromActor(this)]);
         } else {
             throw Error.reject("not authorized");
         };
     };
 
-    // Partition HelloService canisters by the group passed in
-    public shared ({ caller = creator }) func createHelloServiceCanisterByGroup(group : Text) : async ?Text {
-        let pk = "group#" # group;
+    // Partition Service canisters by the group passed in
+    func createServiceCanister(pk : Text) : async ?Text {
         let canisterIds = getCanisterIdsIfExists(pk);
         if (canisterIds == []) {
-            ?(await createHelloServiceCanister(pk, ?[owner, Principal.fromActor(this)]));
+            ?(await _createServiceCanister(pk, ?[owner, Principal.fromActor(this)]));
             // the partition already exists, so don't create a new canister
         } else {
             Debug.print(pk # " already exists");
@@ -64,26 +67,26 @@ shared ({ caller = owner }) actor class IndexCanister() = this {
         };
     };
 
-    // Spins up a new HelloService canister with the provided pk and controllers
-    func createHelloServiceCanister(pk : Text, controllers : ?[Principal]) : async Text {
-        Debug.print("creating new hello service canister with pk=" # pk);
-        // Pre-load 300 billion cycles for the creation of a new Hello Service canister
+    // Spins up a new Service canister with the provided pk and controllers
+    func _createServiceCanister(pk : Text, controllers : ?[Principal]) : async Text {
+        Debug.print("creating new service canister with pk=" # pk);
+        // Pre-load 300 billion cycles for the creation of a new Service canister
         // Note that canister creation costs 100 billion cycles, meaning there are 200 billion
         // left over for the new canister when it is created
         Cycles.add(300_000_000_000);
-        let newHelloServiceCanister = await IndexService.IndexService({
+        let newServiceCanister = await IndexService.IndexService({
             partitionKey = pk;
             scalingOptions = {
-                autoScalingHook = autoScaleHelloServiceCanister;
+                autoScalingHook = autoScaleServiceCanister;
                 sizeLimit = #heapSize(475_000_000); // Scale out at 475MB
                 // for auto-scaling testing
                 //sizeLimit = #count(3); // Scale out at 3 entities inserted
             };
             owners = controllers;
         });
-        let newHelloServiceCanisterPrincipal = Principal.fromActor(newHelloServiceCanister);
+        let newServiceCanisterPrincipal = Principal.fromActor(newServiceCanister);
         await CA.updateCanisterSettings({
-            canisterId = newHelloServiceCanisterPrincipal;
+            canisterId = newServiceCanisterPrincipal;
             settings = {
                 controllers = controllers;
                 compute_allocation = ?0;
@@ -92,11 +95,11 @@ shared ({ caller = owner }) actor class IndexCanister() = this {
             };
         });
 
-        let newHelloServiceCanisterId = Principal.toText(newHelloServiceCanisterPrincipal);
-        // After creating the new Hello Service canister, add it to the pkToCanisterMap
-        pkToCanisterMap := CanisterMap.add(pkToCanisterMap, pk, newHelloServiceCanisterId);
+        let newServiceCanisterId = Principal.toText(newServiceCanisterPrincipal);
+        // After creating the new Service canister, add it to the pkToCanisterMap
+        pkToCanisterMap := CanisterMap.add(pkToCanisterMap, pk, newServiceCanisterId);
 
-        Debug.print("new hello service canisterId=" # newHelloServiceCanisterId);
-        newHelloServiceCanisterId;
+        Debug.print("new service canisterId=" # newServiceCanisterId);
+        newServiceCanisterId;
     };
 };

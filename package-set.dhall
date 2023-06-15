@@ -1,5 +1,6 @@
 let upstream =
       https://github.com/dfinity/vessel-package-set/releases/download/mo-0.8.4-20230311/package-set.dhall
+let Package = { name : Text, version : Text, repo : Text, dependencies : List Text }
 
 let packages = [
   { name = "stable-rbtree"
@@ -22,6 +23,7 @@ let packages = [
   , version = "beta"
   , dependencies = [ "base" ]
   },
-]
+  ]
+   : List Package
 
-in  upstream # packages
+in  upstream # packages 

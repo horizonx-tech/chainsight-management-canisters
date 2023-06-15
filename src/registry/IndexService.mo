@@ -1,6 +1,7 @@
 import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
+import TimeStampedSk "TimeStampedSK";
 
 shared ({ caller = owner }) actor class IndexService({
     // the primary key of this canister

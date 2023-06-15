@@ -6,14 +6,8 @@
       "main": "src/registry/IndexRegistry.mo",
       "declarations": {
         "node_compatibility": true
-      }
-    },
-    "indexService": {
-      "type": "motoko",
-      "main": "src/registry/IndexService.mo",
-      "declarations": {
-        "node_compatibility": true
-      }
+      },
+      "post_install": ["dfx canister call indexRegistry init"]
     }
   },
   "declarations": {

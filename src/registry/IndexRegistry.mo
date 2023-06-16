@@ -9,8 +9,52 @@ import CanisterMap "mo:candb/CanisterMap";
 import Utils "mo:candb/Utils";
 import Buffer "mo:stable-buffer/StableBuffer";
 import IndexService "./IndexService";
+import Canister "Canister";
+import CanDB "mo:candb/CanDB";
+import Entity "mo:candb/Entity";
+import CanisterRepository "CanisterRepository";
+import Array "mo:base/Array";
+import Log "Log";
+import LogRepository "LogRepository";
+import Time "mo:base/Time";
 
 shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
+    type DB = actor {
+        put : shared (opts : CanDB.PutOptions) -> async ();
+        get : shared (opts : CanDB.GetOptions) -> async (?Entity.Entity);
+        scan : shared (opts : CanDB.ScanOptions) -> async (CanDB.ScanResult);
+    };
+    type CanisterRepositoryIFace = {
+        put : (canister : Canister.Canister) -> async ();
+        get : (principal : Principal) -> async (?Canister.Canister);
+    };
+    type LogRepositoryIFace = {
+        putCallLog : Log.CallLog -> async ();
+        listCallLogsBetween : (canister : Canister.Canister, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
+    };
+
+    func listLogRepositories() : [LogRepositoryIFace] {
+        let canisterIds = getCanisterIdsIfExists("Logs");
+        Array.map<Text, LogRepositoryIFace>(
+            canisterIds,
+            func(canisterId) {
+                let act = actor (canisterId) : DB;
+                LogRepository.Repository(act);
+            },
+        );
+    };
+
+    func listCanisterRepositories() : [CanisterRepositoryIFace] {
+        let canisterIds = getCanisterIdsIfExists("Canisters");
+        Array.map<Text, CanisterRepositoryIFace>(
+            canisterIds,
+            func(canisterId) {
+                let act = actor (canisterId) : DB;
+                CanisterRepository.Repository(act);
+            },
+        );
+    };
+
     /// @required stable variable (Do not delete or change)
     ///
     /// Holds the CanisterMap of PK -> CanisterIdList
@@ -25,12 +69,47 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         getCanisterIdsIfExists(pk);
     };
 
+    public shared func put() : async () {
+        await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this)));
+    };
+
+    public shared func get() : async ?Canister.Canister {
+        await listCanisterRepositories()[0].get(Principal.fromActor(this));
+    };
+
+    public shared func debugPutLog() : async () {
+        let can = Canister.newCanister(Principal.fromActor(this));
+        await listLogRepositories()[0].putCallLog(Log.newCallLog(can, can));
+    };
+
+    public shared ({ caller = caller }) func putLog(callTo : Principal) : async () {
+        await listLogRepositories()[0].putCallLog(Log.newCallLog(Canister.newCanister(caller), Canister.newCanister(callTo)));
+    };
+
+    public shared func listLogsOf(principal : Principal, from : Time.Time, to : Time.Time) : async ([Log.CallLog]) {
+        await listLogRepositories()[0].listCallLogsBetween(Canister.newCanister(principal), from, ?to);
+    };
+
+    public shared func exists(principal : Principal) : async Bool {
+
+        for (repo in listCanisterRepositories().vals()) {
+            if ((await repo.get(principal)) != null) {
+                return true;
+            };
+        };
+        return false;
+    };
+
     public shared (msg) func init() : async [?Text] {
         assert (owner == msg.caller);
         ([
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
         ]);
+    };
+
+    public shared ({ caller = caller }) func registerCanister() {
+        let canister = Canister.newCanister(caller);
     };
 
     /// @required function (Do not delete or change)

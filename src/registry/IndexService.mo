@@ -2,6 +2,10 @@ import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
 import TimeStampedSk "TimeStampedSK";
+import Canister "Canister";
+import Principal "mo:base/Principal";
+import Text "mo:base/Text";
+import Debug "mo:base/Debug";
 
 shared ({ caller = owner }) actor class IndexService({
     // the primary key of this canister
@@ -11,6 +15,7 @@ shared ({ caller = owner }) actor class IndexService({
     // (optional) allows the developer to specify additional owners (i.e. for allowing admin or backfill access to specific endpoints)
     owners : ?[Principal];
 }) {
+    let delimiter = ":";
     /// @required (may wrap, but must be present in some form in the canister)
     stable let db = CanDB.init({
         pk = partitionKey;
@@ -33,59 +38,29 @@ shared ({ caller = owner }) actor class IndexService({
         };
     };
 
-    // returns a greeting to the user if exists
-    public query func greetUser(name : Text) : async ?Text {
-        let user = switch (CanDB.get(db, { sk = name })) {
-            case null { null };
-            case (?userEntity) { unwrapUser(userEntity) };
-        };
-
-        switch (user) {
-            case null { null };
-            case (?u) {
-                ?("Hello " # u.displayName # " from " # db.pk);
-            };
-        };
-    };
-
-    // Create a new user. In this basic case, we're using the user's name as the sort key
-    // This works for our hello world app, but as names are easily duplicated, one might want
-    // to attach an unique identifier to the sk to separate users with the same name
-    public func putUser(name : Text, displayName : Text) : async () {
-        if (name == "" or displayName == "") { return };
-
-        // inserts the entity into CanDB
+    public shared ({ caller = caller }) func put(opts : CanDB.PutOptions) : async () {
+        assert (caller == owner);
+        Debug.print("opts.sk");
+        Debug.print(opts.sk);
         await* CanDB.put(
             db,
-            {
-                sk = name;
-                attributes = [
-                    ("name", #text(name)),
-                    ("displayName", #text(displayName)),
-                ];
-            },
+            opts,
         );
     };
 
-    type User = {
-        name : Text;
-        displayName : Text;
+    public shared ({ caller = caller }) func scan(opts : CanDB.ScanOptions) : async CanDB.ScanResult {
+        assert (caller == owner);
+        CanDB.scan(
+            db,
+            opts,
+        );
     };
 
-    // attempts to cast an Entity (retrieved from CanDB) into a User type
-    func unwrapUser(entity : Entity.Entity) : ?User {
-        let { sk; attributes } = entity;
-        let nameValue = Entity.getAttributeMapValueForKey(attributes, "name");
-        let displayNameValue = Entity.getAttributeMapValueForKey(attributes, "displayName");
-
-        switch (nameValue, displayNameValue) {
-            case (
-                ?(#text(name)),
-                ?(#text(displayName)),
-            ) { ?{ name; displayName } };
-            case _ {
-                null;
-            };
-        };
+    public shared ({ caller = caller }) func get(opts : CanDB.GetOptions) : async ?Entity.Entity {
+        return CanDB.get(
+            db,
+            opts,
+        );
     };
+
 };

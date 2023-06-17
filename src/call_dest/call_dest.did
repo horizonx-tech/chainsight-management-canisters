@@ -1,0 +1,5 @@
+type CallDestCanister = service {
+    example_call : (blob) -> (blob);
+    set_proxy : (text) -> ();
+};
+service : () -> CallDestCanister;

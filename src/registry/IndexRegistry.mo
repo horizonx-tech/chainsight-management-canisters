@@ -73,6 +73,10 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this)));
     };
 
+    public shared func registerCanister(principal : Principal) : async () {
+        await listCanisterRepositories()[0].put(Canister.newCanister(principal));
+    };
+
     public shared func get() : async ?Canister.Canister {
         await listCanisterRepositories()[0].get(Principal.fromActor(this));
     };
@@ -82,7 +86,7 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         await listLogRepositories()[0].putCallLog(Log.newCallLog(can, can));
     };
 
-    public shared ({ caller = caller }) func putLog(callTo : Principal) : async () {
+    public shared func putLog(caller : Principal, callTo : Principal) : async () {
         await listLogRepositories()[0].putCallLog(Log.newCallLog(Canister.newCanister(caller), Canister.newCanister(callTo)));
     };
 
@@ -91,7 +95,6 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
     };
 
     public shared func exists(principal : Principal) : async Bool {
-
         for (repo in listCanisterRepositories().vals()) {
             if ((await repo.get(principal)) != null) {
                 return true;
@@ -106,10 +109,6 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
         ]);
-    };
-
-    public shared ({ caller = caller }) func registerCanister() {
-        let canister = Canister.newCanister(caller);
     };
 
     /// @required function (Do not delete or change)

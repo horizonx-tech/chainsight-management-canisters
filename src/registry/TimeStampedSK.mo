@@ -5,6 +5,7 @@ import Text "mo:base/Text";
 import Iter "mo:base/Iter";
 import Nat32 "mo:base/Nat32";
 import Char "mo:base/Char";
+import Debug "mo:base/Debug";
 
 module TimeStampedSK {
     type TimeStampedSK = {
@@ -34,7 +35,8 @@ module TimeStampedSK {
     };
 
     func toText(ts : TimeStampedSK) : Text {
-        ts.prefix #delimiter # ts.id # delimiter # Int.toText(ts.time);
+        Debug.print(ts.id);
+        ts.prefix # delimiter # ts.id # delimiter # Int.toText(ts.time);
     };
 
     public func fromSKText(txt : Text) : TimeStampedSK {

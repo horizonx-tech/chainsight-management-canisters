@@ -1,0 +1,15 @@
+type CallSourceCanister = service {
+    example_call : () -> (ExampleCallResult);
+    set_proxy : (text) -> ();
+    set_dest : (text) -> ();
+};
+type ExampleCallResult = record {
+    txt : text;
+    num : nat;
+    sample_struct : SampleStruct;
+    bytes : blob;
+};
+type SampleStruct = record {
+    txt : text;
+};
+service : () -> CallSourceCanister;

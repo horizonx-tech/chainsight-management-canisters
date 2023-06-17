@@ -1,7 +1,9 @@
-use candid::Error;
+use async_trait::async_trait;
+use ic_cdk::api::call::CallResult;
 
 use crate::message::{Message, MessageResult};
 
+#[async_trait]
 pub trait Caller {
-    fn call(m: Message) -> Result<MessageResult, Error>;
+    async fn call(&self, m: Message) -> CallResult<MessageResult>;
 }

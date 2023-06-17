@@ -8,6 +8,24 @@
         "node_compatibility": true
       },
       "post_install": ["dfx canister call indexRegistry init"]
+    },
+    "proxy": {
+      "type": "rust",
+      "candid": "src/proxy/proxy.did",
+      "package": "proxy",
+      "dependencies": ["indexRegistry"]
+    },
+    "call_source": {
+      "type": "rust",
+      "candid": "src/call_source/call_source.did",
+      "package": "call_source",
+      "dependencies": ["proxy"]
+    },
+    "call_dest": {
+      "type": "rust",
+      "candid": "src/call_dest/call_dest.did",
+      "package": "call_dest",
+      "dependencies": ["proxy"]
     }
   },
   "declarations": {

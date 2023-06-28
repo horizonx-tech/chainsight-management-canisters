@@ -1,11 +1,11 @@
 import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
-import TimeStampedSk "TimeStampedSK";
-import Canister "Canister";
+import TimeStampedSk "../db/TimeStampedSK";
+import Canister "../canister/Canister";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
-import Log "Log";
+import Log "../log/Log";
 import Iter "mo:base/Iter";
 import Time "mo:base/Time";
 import Option "mo:base/Option";
@@ -28,14 +28,14 @@ module LogRepository {
                 attributes = [("interactTo", #text(Principal.toText(log.interactTo.principal)))];
             });
         };
-        public let putCalledLog : (Log.CallLog) -> async () = func(log : Log.CallLog) : async () {
+        public let put : (Log.CallLog) -> async () = func(log : Log.CallLog) : async () {
             await db.put({
                 sk = TimeStampedSk.calledLogSK(log.canister.principal, log.at);
                 attributes = [("interactTo", #text(Principal.toText(log.interactTo.principal)))];
             });
         };
 
-        public func listCallLogsBetween(canister : Canister.Canister, from : Time.Time, to : ?Time.Time) : async ([Log.CallLog]) {
+        public func list(canister : Canister.Canister, from : Time.Time, to : ?Time.Time) : async ([Log.CallLog]) {
             let upperBound = switch (to) {
                 case (?t) { TimeStampedSk.callLogSK(canister.principal, t) };
                 case (null) {

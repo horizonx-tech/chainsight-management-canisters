@@ -1,19 +1,24 @@
 {
   "version": 1,
   "canisters": {
-    "indexRegistry": {
+    "registry": {
       "type": "motoko",
-      "main": "src/registry/IndexRegistry.mo",
+      "main": "src/registry/Registry.mo",
       "declarations": {
         "node_compatibility": true
       },
-      "post_install": ["dfx canister call indexRegistry init"]
+      "post_install": ["dfx canister call registry init"]
+    },
+    "vault": {
+      "type": "rust",
+      "candid": "src/vault/vault.did",
+      "package": "vault"
     },
     "proxy": {
       "type": "rust",
       "candid": "src/proxy/proxy.did",
       "package": "proxy",
-      "dependencies": ["indexRegistry"]
+      "dependencies": ["registry"]
     },
     "call_source": {
       "type": "rust",

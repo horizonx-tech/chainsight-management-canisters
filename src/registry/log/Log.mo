@@ -1,6 +1,6 @@
 import Time "mo:base/Time";
 import Principal "mo:base/Principal";
-import Canister "Canister";
+import Canister "../canister/Canister";
 module Log {
     public type CallLog = Log;
     public type CalledLog = Log;

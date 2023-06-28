@@ -6,7 +6,7 @@ dfx canister stop --all
 dfx canister delete --all
 dfx deploy
 
-dfx canister call proxy set_registry $(dfx canister id indexRegistry)
+dfx canister call proxy set_registry $(dfx canister id registry)
 dfx canister call proxy register $(dfx canister id call_source)
 dfx canister call proxy register $(dfx canister id call_dest)
 dfx canister call call_source set_proxy $(dfx canister id proxy)

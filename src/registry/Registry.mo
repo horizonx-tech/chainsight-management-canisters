@@ -8,17 +8,17 @@ import CA "mo:candb/CanisterActions";
 import CanisterMap "mo:candb/CanisterMap";
 import Utils "mo:candb/Utils";
 import Buffer "mo:stable-buffer/StableBuffer";
-import IndexService "./IndexService";
-import Canister "Canister";
+import DB "./db/DB";
+import Canister "canister/Canister";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
-import CanisterRepository "CanisterRepository";
+import CanisterRepository "canister/CanisterRepository";
 import Array "mo:base/Array";
-import Log "Log";
-import LogRepository "LogRepository";
+import Log "log/Log";
+import LogRepository "log/LogRepository";
 import Time "mo:base/Time";
 
-shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
+shared ({ caller = owner }) actor class RegistryCanister() = this {
     type DB = actor {
         put : shared (opts : CanDB.PutOptions) -> async ();
         get : shared (opts : CanDB.GetOptions) -> async (?Entity.Entity);
@@ -29,8 +29,8 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         get : (principal : Principal) -> async (?Canister.Canister);
     };
     type LogRepositoryIFace = {
-        putCallLog : Log.CallLog -> async ();
-        listCallLogsBetween : (canister : Canister.Canister, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
+        put : Log.CallLog -> async ();
+        list : (canister : Canister.Canister, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
     };
 
     func listLogRepositories() : [LogRepositoryIFace] {
@@ -55,20 +55,6 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         );
     };
 
-    /// @required stable variable (Do not delete or change)
-    ///
-    /// Holds the CanisterMap of PK -> CanisterIdList
-    stable var pkToCanisterMap = CanisterMap.init();
-
-    /// @required API (Do not delete or change)
-    ///
-    /// Get all canisters for an specific PK
-    ///
-    /// This method is called often by the candb-client query & update methods.
-    public shared query ({ caller = caller }) func getCanistersByPK(pk : Text) : async [Text] {
-        getCanisterIdsIfExists(pk);
-    };
-
     public shared func put() : async () {
         await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this)));
     };
@@ -83,15 +69,15 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
 
     public shared func debugPutLog() : async () {
         let can = Canister.newCanister(Principal.fromActor(this));
-        await listLogRepositories()[0].putCallLog(Log.newCallLog(can, can));
+        await listLogRepositories()[0].put(Log.newCallLog(can, can));
     };
 
     public shared func putLog(caller : Principal, callTo : Principal) : async () {
-        await listLogRepositories()[0].putCallLog(Log.newCallLog(Canister.newCanister(caller), Canister.newCanister(callTo)));
+        await listLogRepositories()[0].put(Log.newCallLog(Canister.newCanister(caller), Canister.newCanister(callTo)));
     };
 
     public shared func listLogsOf(principal : Principal, from : Time.Time, to : Time.Time) : async ([Log.CallLog]) {
-        await listLogRepositories()[0].listCallLogsBetween(Canister.newCanister(principal), from, ?to);
+        await listLogRepositories()[0].list(Canister.newCanister(principal), from, ?to);
     };
 
     public shared func exists(principal : Principal) : async Bool {
@@ -108,7 +94,22 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         ([
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
+            await createServiceCanister("Vaults"),
         ]);
+    };
+
+    /// @required stable variable (Do not delete or change)
+    ///
+    /// Holds the CanisterMap of PK -> CanisterIdList
+    stable var pkToCanisterMap = CanisterMap.init();
+
+    /// @required API (Do not delete or change)
+    ///
+    /// Get all canisters for an specific PK
+    ///
+    /// This method is called often by the candb-client query & update methods.
+    public shared query ({ caller = caller }) func getCanistersByPK(pk : Text) : async [Text] {
+        getCanisterIdsIfExists(pk);
     };
 
     /// @required function (Do not delete or change)
@@ -152,7 +153,7 @@ shared ({ caller = owner }) actor class IndexRegistryCanister() = this {
         // Note that canister creation costs 100 billion cycles, meaning there are 200 billion
         // left over for the new canister when it is created
         Cycles.add(300_000_000_000);
-        let newServiceCanister = await IndexService.IndexService({
+        let newServiceCanister = await DB.DB({
             partitionKey = pk;
             scalingOptions = {
                 autoScalingHook = autoScaleServiceCanister;

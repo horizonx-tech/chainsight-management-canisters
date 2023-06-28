@@ -1,13 +1,13 @@
 import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
-import TimeStampedSk "TimeStampedSK";
-import Canister "Canister";
+import TimeStampedSk "../db/TimeStampedSK";
+import Canister "../canister/Canister";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Debug "mo:base/Debug";
 
-shared ({ caller = owner }) actor class IndexService({
+shared ({ caller = owner }) actor class DB({
     // the primary key of this canister
     partitionKey : Text;
     // the scaling options that determine when to auto-scale out this canister storage partition

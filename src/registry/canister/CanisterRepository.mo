@@ -1,7 +1,7 @@
 import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
-import TimeStampedSk "TimeStampedSK";
+import TimeStampedSk "../db/TimeStampedSK";
 import Canister "Canister";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";

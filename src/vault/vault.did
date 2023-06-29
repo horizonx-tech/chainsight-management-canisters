@@ -2,6 +2,8 @@ type VaultCanister = service {
     deposit : () -> ();
     balance_of : (principal) -> (nat);
     total_balance : () -> (nat);
+    consume : (nat) -> ();
+    supply : (nat) -> ();
 };
 
 service : () -> VaultCanister;

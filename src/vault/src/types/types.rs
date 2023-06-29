@@ -7,7 +7,7 @@ use candid::{CandidType, Decode, Encode, Nat, Principal};
 use ic_stable_structures::{BoundedStorable, Storable};
 use serde::Deserialize;
 
-#[derive(CandidType, Deserialize, Default, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(CandidType, Deserialize, Default, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct Balance(Nat);
 
 impl Into<Nat> for Balance {
@@ -25,8 +25,18 @@ impl From<Nat> for Balance {
         Self(nat)
     }
 }
+impl From<u128> for Balance {
+    fn from(nat: u128) -> Self {
+        Self(Nat::from(nat))
+    }
+}
 
 impl Balance {
+    pub fn mul(&self, idx: Index) -> Balance {
+        let val = self.0.clone();
+        let idx = idx.0 .0;
+        val.mul(idx).div(Index::default().0 .0).into()
+    }
     pub fn div(&self, idx: Index) -> Balance {
         let val = self.0.clone();
         let idx = idx.0 .0;
@@ -34,7 +44,7 @@ impl Balance {
     }
 }
 
-#[derive(CandidType, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord)]
+#[derive(CandidType, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct Index(Balance);
 
 impl Index {
@@ -134,4 +144,58 @@ impl BoundedStorable for Balance {
 impl BoundedStorable for Index {
     const MAX_SIZE: u32 = 100;
     const IS_FIXED_SIZE: bool = false;
+}
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_index_as_balance() {
+        let index = Index::default();
+        let balance: Balance = index.as_balance();
+        assert_eq!(balance, Balance::from(Nat::from(100_000_000_000u128)));
+    }
+    #[test]
+    fn test_index_mul() {
+        let index = Index::default();
+        let balance: Balance = Balance::from(1);
+        assert_eq!(index.mul(balance.clone()), balance);
+    }
+    #[test]
+    fn test_index_add() {
+        let index = Index::default();
+        let expected: Index = Index::from(Balance::from(100_000_000_001u128));
+        assert_eq!(index.add(1.into()), expected);
+    }
+    #[test]
+    fn test_index_sub() {
+        let index = Index::default();
+        let expected: Index = Index::from(Balance::from(99_999_999_999u128));
+        assert_eq!(index.sub(1.into()), expected);
+    }
+    #[test]
+    fn test_index_percent() {
+        let expected: Index = Index::from(Balance::from(50_000_000_000u128));
+        assert_eq!(
+            Index::percent(50_000_000_000u128.into(), 100_000_000_000u128.into()),
+            expected
+        );
+    }
+    #[test]
+    fn test_balance_mul() {
+        let balance = Balance::from(100_000_000_000u128);
+        let expected: Balance = Balance::from(50_000_000_000u128); // 1/2
+        assert_eq!(
+            balance.mul(Index::from(Balance::from(50_000_000_000u128))),
+            expected
+        );
+    }
+    #[test]
+    fn test_balance_div() {
+        let balance = Balance::from(100_000_000_000u128);
+        let expected: Balance = Balance::from(200_000_000_000u128); // 2
+        assert_eq!(
+            balance.div(Index::from(Balance::from(50_000_000_000u128))),
+            expected
+        );
+    }
 }

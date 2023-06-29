@@ -531,6 +531,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "initializer"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "common",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "ic-stable-structures",
+ "rpc",
+ "serde",
+ "serde_bytes",
+]
+
+[[package]]
 name = "io-lifetimes"
 version = "1.0.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"

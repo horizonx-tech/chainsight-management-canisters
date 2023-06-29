@@ -9,11 +9,17 @@
       },
       "post_install": ["dfx canister call registry init"]
     },
+    "initializer": {
+      "type": "rust",
+      "candid": "src/initializer/initializer.did",
+      "package": "initializer"
+    },
     "vault": {
       "type": "rust",
       "candid": "src/vault/vault.did",
       "package": "vault"
     },
+
     "proxy": {
       "type": "rust",
       "candid": "src/proxy/proxy.did",

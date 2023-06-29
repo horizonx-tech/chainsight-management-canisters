@@ -34,48 +34,59 @@ async fn deposit() {
     add_balance(caller(), Nat::from(accepted))
 }
 
+#[ic_cdk::init]
+fn init(param: Vec<u8>) {
+    set_chainsight_canister_id(Principal::from_slice(param.as_slice()))
+}
+
+fn set_chainsight_canister_id(principal: Principal) {
+    CHAINSIGHT_CANISTER_ID.with(|m| {
+        m.borrow_mut().set(principal.to_string()).unwrap();
+    })
+}
+
 fn add_balance(principal: Principal, value: Nat) {
     let depositor = Depositor::from(principal);
-    let added: Nat = Balance::from(value).div(index()).into();
+    let added: Nat = Balance::from(value.clone()).div(index()).into();
     MAP.with(|m| {
         let balance: Nat = m.borrow().get(&depositor).unwrap_or_default().into();
         m.borrow_mut()
             .insert(depositor, Balance::from(balance.add(added.clone())));
     });
+    add_total_balance(value, false);
+}
+
+fn add_total_balance(value: Nat, neg: bool) {
     TOTAL_BALANCE.with(|m| {
         let balance: Nat = m.borrow().get().into();
-        m.borrow_mut()
-            .set(Balance::from(balance.add(added)))
-            .unwrap();
+        let after = match neg {
+            true => balance.sub(value),
+            false => balance.add(value),
+        };
+        m.borrow_mut().set(after.into()).unwrap();
     })
 }
 
 #[query]
 fn balance_of(principal: Principal) -> Nat {
     MAP.with(|m| {
-        let balance = m
-            .borrow()
-            .get(&principal.into())
-            .map(Balance::into)
-            .unwrap_or_default();
+        let balance = m.borrow().get(&principal.into()).unwrap_or_default();
+        ic_cdk::println!("balance of {} is {:?}", principal, balance);
         let idx = index();
-        idx.mul(balance).into()
+        ic_cdk::println!("index is {:?}", idx);
+        balance.mul(idx).into()
     })
 }
-
+#[update]
 fn consume(delta: Nat) {
-    let total_balance_after = total_balance().sub(delta);
-    _add_index(total_balance_after, true)
+    add_index(delta.clone(), true);
+    add_total_balance(delta, true);
 }
 
+#[update]
 fn supply(delta: Nat) {
-    let total_balance_after = total_balance().add(delta);
-    _add_index(total_balance_after, false)
-}
-
-fn _add_index(after: Nat, neg: bool) {
-    let diff = Index::percent(after, total_balance());
-    add_index(diff.as_balance().into(), neg);
+    add_index(delta.clone(), false);
+    add_total_balance(delta, false);
 }
 
 fn index() -> Index {
@@ -100,9 +111,28 @@ fn target_canister() -> Principal {
     CHAINSIGHT_CANISTER_ID.with(|c| Principal::from_str(c.borrow().get().as_str()).unwrap())
 }
 
-fn add_index(val: Nat, neg: bool) {
-    INDEX.with(|m| match neg {
-        true => m.borrow_mut().set(m.borrow().get().add(val)).unwrap(),
-        false => m.borrow_mut().set(m.borrow().get().sub(val)).unwrap(),
+fn add_index(delta: Nat, neg: bool) {
+    let idx = Index::percent(delta, total_balance());
+    INDEX.with(|m| {
+        let current = index();
+        let after = match neg {
+            true => current.sub(idx.into()),
+            false => current.add(idx.into()),
+        };
+        m.borrow_mut().set(after).unwrap();
     });
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    #[test]
+    fn test_add_index() {
+        let delta = 10;
+        add_total_balance(1_000_000_000_000u128.into(), false);
+        add_index(delta.into(), true);
+        add_total_balance(10.into(), true);
+        assert_eq!(index(), Index::from(Balance::from(99_999_999_999)));
+        assert_eq!(total_balance(), Nat::from(999_999_999_990u128));
+    }
 }

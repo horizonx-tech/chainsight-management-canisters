@@ -30,7 +30,7 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     };
     type LogRepositoryIFace = {
         put : Log.CallLog -> async ();
-        list : (canister : Canister.Canister, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
+        list : (canister : Principal, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
     };
 
     func listLogRepositories() : [LogRepositoryIFace] {
@@ -55,12 +55,12 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         );
     };
 
-    public shared func put() : async () {
-        await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this)));
+    public shared func debug_put() : async () {
+        await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this), Principal.fromActor(this)));
     };
 
-    public shared func registerCanister(principal : Principal) : async () {
-        await listCanisterRepositories()[0].put(Canister.newCanister(principal));
+    public shared func registerCanister(principal : Principal, vault : Principal) : async () {
+        await listCanisterRepositories()[0].put(Canister.newCanister(principal, vault));
     };
 
     public shared func get() : async ?Canister.Canister {
@@ -68,16 +68,15 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     };
 
     public shared func debugPutLog() : async () {
-        let can = Canister.newCanister(Principal.fromActor(this));
-        await listLogRepositories()[0].put(Log.newCallLog(can, can));
+        await listLogRepositories()[0].put(Log.newCallLog(Principal.fromActor(this), Principal.fromActor(this)));
     };
 
     public shared func putLog(caller : Principal, callTo : Principal) : async () {
-        await listLogRepositories()[0].put(Log.newCallLog(Canister.newCanister(caller), Canister.newCanister(callTo)));
+        await listLogRepositories()[0].put(Log.newCallLog(caller, callTo));
     };
 
     public shared func listLogsOf(principal : Principal, from : Time.Time, to : Time.Time) : async ([Log.CallLog]) {
-        await listLogRepositories()[0].list(Canister.newCanister(principal), from, ?to);
+        await listLogRepositories()[0].list(principal, from, ?to);
     };
 
     public shared func exists(principal : Principal) : async Bool {

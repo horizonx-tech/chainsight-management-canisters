@@ -2,7 +2,6 @@ import CA "mo:candb/CanisterActions";
 import CanDB "mo:candb/CanDB";
 import Entity "mo:candb/Entity";
 import TimeStampedSk "../db/TimeStampedSK";
-import Canister "../canister/Canister";
 import Principal "mo:base/Principal";
 import Text "mo:base/Text";
 import Log "../log/Log";
@@ -24,25 +23,25 @@ module LogRepository {
         let db = _db;
         public let putCallLog : (Log.CallLog) -> async () = func(log : Log.CallLog) : async () {
             await db.put({
-                sk = TimeStampedSk.callLogSK(log.canister.principal, log.at);
-                attributes = [("interactTo", #text(Principal.toText(log.interactTo.principal)))];
+                sk = TimeStampedSk.callLogSK(log.canister, log.at);
+                attributes = [("interactTo", #text(Principal.toText(log.interactTo)))];
             });
         };
         public let put : (Log.CallLog) -> async () = func(log : Log.CallLog) : async () {
             await db.put({
-                sk = TimeStampedSk.calledLogSK(log.canister.principal, log.at);
-                attributes = [("interactTo", #text(Principal.toText(log.interactTo.principal)))];
+                sk = TimeStampedSk.calledLogSK(log.canister, log.at);
+                attributes = [("interactTo", #text(Principal.toText(log.interactTo)))];
             });
         };
 
-        public func list(canister : Canister.Canister, from : Time.Time, to : ?Time.Time) : async ([Log.CallLog]) {
+        public func list(canister : Principal, from : Time.Time, to : ?Time.Time) : async ([Log.CallLog]) {
             let upperBound = switch (to) {
-                case (?t) { TimeStampedSk.callLogSK(canister.principal, t) };
+                case (?t) { TimeStampedSk.callLogSK(canister, t) };
                 case (null) {
-                    TimeStampedSk.callLogSK(canister.principal, Time.now());
+                    TimeStampedSk.callLogSK(canister, Time.now());
                 };
             };
-            let lowerBound = TimeStampedSk.callLogSK(canister.principal, from);
+            let lowerBound = TimeStampedSk.callLogSK(canister, from);
             let { entities; nextKey } = await db.scan({
                 skLowerBound = lowerBound;
                 skUpperBound = upperBound;
@@ -60,9 +59,9 @@ module LogRepository {
                 case (_) { Principal.fromText("") };
             };
             {
-                canister = Canister.newCanister(Principal.fromText(_sk.id));
+                canister = Principal.fromText(_sk.id);
                 at = _sk.time;
-                interactTo = Canister.newCanister(interact);
+                interactTo = interact;
             };
         };
     };

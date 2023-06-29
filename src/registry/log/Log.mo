@@ -1,18 +1,17 @@
 import Time "mo:base/Time";
 import Principal "mo:base/Principal";
-import Canister "../canister/Canister";
 module Log {
     public type CallLog = Log;
     public type CalledLog = Log;
     public type Log = {
-        canister : Canister.Canister;
-        interactTo : Canister.Canister;
+        canister : Principal;
+        interactTo : Principal;
         at : Time.Time;
     };
 
-    public let newCallLog : (Canister.Canister, Canister.Canister) -> CallLog = func(canister : Canister.Canister, interactTo : Canister.Canister) : CallLog = newLog(canister, interactTo);
-    public let newCalledLog : (Canister.Canister, Canister.Canister) -> CalledLog = func(canister : Canister.Canister, interactTo : Canister.Canister) : CalledLog = newLog(canister, interactTo);
-    func newLog(canister : Canister.Canister, interactTo : Canister.Canister) : Log = {
+    public let newCallLog : (Principal, Principal) -> CallLog = func(canister : Principal, interactTo : Principal) : CallLog = newLog(canister, interactTo);
+    public let newCalledLog : (Principal, Principal) -> CalledLog = func(canister : Principal, interactTo : Principal) : CalledLog = newLog(canister, interactTo);
+    func newLog(canister : Principal, interactTo : Principal) : Log = {
         canister = canister;
         interactTo = interactTo;
         at = Time.now();

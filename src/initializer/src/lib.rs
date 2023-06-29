@@ -20,21 +20,21 @@ const VAULT_WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/vault.wasm");
 
 #[update]
-async fn deploy_vault_of() -> Principal {
+async fn deploy_vault_of(principal: Principal) -> Principal {
     let p = create_new_canister().await.unwrap();
-    install(&p).await.unwrap();
+    install(&p, &principal).await.unwrap();
     after_install(&p).await.unwrap();
     p
 }
 
-async fn install(canister_id: &Principal) -> CallResult<()> {
-    let canister_id = canister_id.clone();
+async fn install(created: &Principal, canister: &Principal) -> CallResult<()> {
+    let canister_id = created.clone();
 
     install_code(InstallCodeArgument {
         mode: CanisterInstallMode::Reinstall,
         canister_id,
         wasm_module: VAULT_WASM.to_vec(),
-        arg: encode_one(canister_id.as_slice().to_vec()).unwrap(),
+        arg: encode_one(canister.as_slice().to_vec()).unwrap(),
     })
     .await
 }

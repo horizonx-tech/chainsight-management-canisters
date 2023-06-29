@@ -18,7 +18,7 @@ module CanisterRepository {
         public let put : (Canister.Canister) -> async () = func(canister : Canister.Canister) : async () {
             await db.put({
                 sk = sk(canister.principal);
-                attributes = [];
+                attributes = [("vault", #text(Principal.toText(canister.vault)))];
             });
         };
         public let get : (principal : Principal) -> async ?Canister.Canister = func(principal : Principal) : async ?Canister.Canister {
@@ -29,11 +29,16 @@ module CanisterRepository {
         };
 
         func unwrapCanister(entity : Entity.Entity) : Canister.Canister {
-            let { sk } = entity;
+            let { sk; attributes } = entity;
             let prefix = "Canister" # delimiter;
             let principal = Principal.fromText(Text.replace(sk, #text prefix, ""));
+            let vault = switch (Entity.getAttributeMapValueForKey(attributes, "vault")) {
+                case (?(#text(t))) { Principal.fromText(t) };
+                case (_) { Principal.fromText("") };
+            };
             {
                 principal;
+                vault;
             };
         };
         func sk(principal : Principal) : Text.Text {

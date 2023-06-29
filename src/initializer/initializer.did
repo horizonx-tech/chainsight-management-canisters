@@ -1,5 +1,5 @@
 type Time = int;
 type InitializerCanister = service {
-    deploy_vault_of : () -> (principal);
+    deploy_vault_of : (principal) -> (principal);
 };
 service : () -> InitializerCanister;

@@ -104,11 +104,14 @@ fn set_registry(id: String) {
 }
 
 #[update]
-async fn register(principal: String) {
+async fn register(principal: String, vault: String) {
     let _: CallResult<()> = ic_cdk::api::call::call(
         registry(),
         "registerCanister",
-        (Principal::from_str(principal.as_str()).unwrap(),),
+        (
+            Principal::from_str(principal.as_str()).unwrap(),
+            Principal::from_str(vault.as_str()).unwrap(),
+        ),
     )
     .await;
 }

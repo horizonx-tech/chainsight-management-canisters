@@ -3,8 +3,10 @@ import Principal "mo:base/Principal";
 module Canister {
     public type Canister = {
         principal : Principal;
+        vault : Principal;
     };
-    public let newCanister : (Principal) -> Canister = func(principal : Principal) : Canister = {
+    public let newCanister : (Principal, Principal) -> Canister = func(principal : Principal, vault : Principal) : Canister = {
         principal = principal;
+        vault = vault;
     };
 };

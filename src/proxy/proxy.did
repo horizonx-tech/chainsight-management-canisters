@@ -3,7 +3,7 @@ type ProxyCanister = service {
     list_logs : (principal, Time, Time) -> (vec CallLog);
     set_registry : (text) -> ();
     put_call_log : (principal) -> ();
-    register : (text) -> ();
+    register : (text, text) -> ();
     proxy_call : (principal, principal, text, vec nat8) -> (vec nat8);
 };
 type Canister = record { "principal" : principal };

@@ -1,4 +1,4 @@
-import TimeStampedSK "../src/registry/TimeStampedSK";
+import TimeStampedSK "../src/registry/db/TimeStampedSK";
 import ActorSpec "./utils/ActorSpec";
 import Debug "mo:base/Debug";
 import Principal "mo:base/Principal";

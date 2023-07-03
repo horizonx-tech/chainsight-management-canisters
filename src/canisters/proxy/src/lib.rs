@@ -14,6 +14,7 @@ struct CallLog {
     interact_to: Canister,
     at: Int,
 }
+
 #[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct Canister {
     principal: Principal,
@@ -41,7 +42,13 @@ async fn list_logs(principal: Principal, from: Int, to: Int) -> Vec<CallLog> {
 }
 
 #[update]
-async fn proxy_call(
+async fn publish_call(from: Principal, id: Principal, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
+    let result = _proxy_call(from, id, "on_update".to_string(), args).await;
+    _put_call_log(id, from).await;
+    result
+}
+
+async fn _proxy_call(
     from: Principal,
     id: Principal,
     method: String,
@@ -66,6 +73,17 @@ async fn proxy_call(
     if result.is_err() {
         ic_cdk::println!("Error: {:?}", result);
     }
+    result
+}
+
+#[update]
+async fn proxy_call(
+    from: Principal,
+    id: Principal,
+    method: String,
+    args: Vec<u8>,
+) -> CallResult<(Vec<u8>,)> {
+    let result = _proxy_call(from, id, method, args).await;
     _put_call_log(from, id).await;
     result
 }
@@ -81,6 +99,7 @@ async fn canister_exists(id: Principal) -> bool {
     //}
     true
 }
+
 #[update]
 async fn put_call_log(call_to: Principal) {
     _put_call_log(ic_cdk::caller(), call_to).await;
@@ -101,17 +120,4 @@ fn set_registry(id: String) {
     REGISTRY.with(|registry| {
         *registry.borrow_mut() = id;
     });
-}
-
-#[update]
-async fn register(principal: String, vault: String) {
-    let _: CallResult<()> = ic_cdk::api::call::call(
-        registry(),
-        "registerCanister",
-        (
-            Principal::from_str(principal.as_str()).unwrap(),
-            Principal::from_str(vault.as_str()).unwrap(),
-        ),
-    )
-    .await;
 }

@@ -1,46 +1,45 @@
 {
   "version": 1,
   "canisters": {
-    "registry": {
+    "_management_canister_registry": {
       "type": "motoko",
-      "main": "src/registry/Registry.mo",
+      "main": "src/canisters/registry/Registry.mo",
       "declarations": {
         "node_compatibility": true
       },
-      "post_install": ["dfx canister call registry init"]
+      "post_install": ["dfx canister call _management_canister_registry init"]
     },
-    "initializer": {
+    "_management_canister_initializer": {
       "type": "rust",
-      "candid": "src/initializer/initializer.did",
+      "candid": "src/canisters/initializer/initializer.did",
       "package": "initializer"
     },
-    "vault": {
+    "_management_canister_vault": {
       "type": "rust",
-      "candid": "src/vault/vault.did",
+      "candid": "src/canisters/vault/vault.did",
       "package": "vault"
     },
-
-    "proxy": {
+    "_management_canister_proxy": {
       "type": "rust",
-      "candid": "src/proxy/proxy.did",
+      "candid": "src/canisters/proxy/proxy.did",
       "package": "proxy",
-      "dependencies": ["registry"]
+      "dependencies": ["_management_canister_registry"]
     },
     "call_source": {
       "type": "rust",
-      "candid": "src/call_source/call_source.did",
+      "candid": "src/canisters/call_source/call_source.did",
       "package": "call_source",
-      "dependencies": ["proxy"]
+      "dependencies": ["_management_proxy"]
     },
     "call_dest": {
       "type": "rust",
-      "candid": "src/call_dest/call_dest.did",
+      "candid": "src/canisters/call_dest/call_dest.did",
       "package": "call_dest",
-      "dependencies": ["proxy"]
+      "dependencies": ["_management_proxy"]
     }
   },
   "declarations": {
-    "output": "src/declarations"
+    "output": "src/canisters/declarations"
   },
   "defaults": {
     "build": {

@@ -24,18 +24,6 @@
       "candid": "src/canisters/proxy/proxy.did",
       "package": "proxy",
       "dependencies": ["_management_canister_registry"]
-    },
-    "call_source": {
-      "type": "rust",
-      "candid": "src/canisters/call_source/call_source.did",
-      "package": "call_source",
-      "dependencies": ["_management_proxy"]
-    },
-    "call_dest": {
-      "type": "rust",
-      "candid": "src/canisters/call_dest/call_dest.did",
-      "package": "call_dest",
-      "dependencies": ["_management_proxy"]
     }
   },
   "declarations": {

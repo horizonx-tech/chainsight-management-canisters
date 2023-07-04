@@ -1,9 +1,11 @@
 use std::{error::Error, path::Path, str::FromStr};
 
-use candid::{CandidType, Decode, Encode, Nat};
+use candid::{CandidType, Nat};
+use client::Client;
 use ic_agent::{export::Principal, identity::Secp256k1Identity, Agent};
 use serde::Deserialize;
 
+mod client;
 #[derive(CandidType)]
 struct Argument {
     amount: Option<Nat>,
@@ -16,32 +18,27 @@ struct CreateCanisterResult {
 pub const INITIALIZER_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
 pub const PROXY_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
 pub const REGISTRY_CANISTER_ID: &str = "cuj6u-c4aaa-aaaaa-qaajq-cai";
+const INITIALIZER_WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/initializer.wasm");
+const PROXY_WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/proxy.wasm");
+const REGISTRY_WASM: &[u8] =
+    include_bytes!("../../../target/wasm32-unknown-unknown/release/registry.wasm");
 
 pub async fn deploy(agent: Agent) -> Result<(), Box<dyn Error>> {
-    agent.fetch_root_key().await?;
-    println!("!!!test");
-    let management_canister_id = Principal::from_text("aaaaa-aa")?;
-    println!("!!!management canister id:{}", management_canister_id);
+    let client = Client::new(agent);
 
-    for canister_id in [
-        INITIALIZER_CANISTER_ID,
-        PROXY_CANISTER_ID,
-        REGISTRY_CANISTER_ID,
+    for canister in [
+        (INITIALIZER_CANISTER_ID, INITIALIZER_WASM),
+        (PROXY_CANISTER_ID, PROXY_WASM),
+        (REGISTRY_CANISTER_ID, REGISTRY_WASM),
     ] {
-        let principal = Principal::from_str(canister_id)?;
-        let response = agent
-            .update(
-                &management_canister_id,
-                "provisional_create_canister_with_cycles",
-            )
-            .with_effective_canister_id(principal)
-            .with_arg(&Encode!(&Argument { amount: None })?)
-            .call_and_wait()
+        let deployed = client
+            .create_canister(Principal::from_str(canister.0).unwrap())
             .await?;
-        let result = Decode!(response.as_slice(), CreateCanisterResult)?;
-        let canister_id: Principal = result.canister_id;
+        client.install_code(deployed, canister.1).await?;
+        println!("Deployed {} to {}", canister.0, deployed)
     }
-
     Ok(())
 }
 pub fn get_dfx_identity(name: &str) -> Secp256k1Identity {

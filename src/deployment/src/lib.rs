@@ -1,4 +1,4 @@
-use std::{error::Error, path::Path, str::FromStr};
+use std::{error::Error, path::Path};
 
 use candid::{CandidType, Nat};
 use client::Client;
@@ -15,9 +15,9 @@ struct CreateCanisterResult {
     canister_id: Principal,
 }
 
-pub const INITIALIZER_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
-pub const PROXY_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
-pub const REGISTRY_CANISTER_ID: &str = "cuj6u-c4aaa-aaaaa-qaajq-cai";
+//pub const INITIALIZER_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
+//pub const PROXY_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
+//pub const REGISTRY_CANISTER_ID: &str = "cuj6u-c4aaa-aaaaa-qaajq-cai";
 const INITIALIZER_WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/initializer.wasm");
 const PROXY_WASM: &[u8] =
@@ -28,16 +28,10 @@ const REGISTRY_WASM: &[u8] =
 pub async fn deploy(agent: Agent) -> Result<(), Box<dyn Error>> {
     let client = Client::new(agent);
 
-    for canister in [
-        (INITIALIZER_CANISTER_ID, INITIALIZER_WASM),
-        (PROXY_CANISTER_ID, PROXY_WASM),
-        (REGISTRY_CANISTER_ID, REGISTRY_WASM),
-    ] {
-        let deployed = client
-            .create_canister(Principal::from_str(canister.0).unwrap())
-            .await?;
-        client.install_code(deployed, canister.1).await?;
-        println!("Deployed {} to {}", canister.0, deployed)
+    for canister in [(INITIALIZER_WASM), (PROXY_WASM), (REGISTRY_WASM)] {
+        let deployed = client.create_canister().await?;
+        client.install_code(deployed, canister).await?;
+        println!("Deployed {}", deployed)
     }
     Ok(())
 }
@@ -59,7 +53,7 @@ mod tests {
     async fn test_deploy() {
         let agent = Agent::builder()
             .with_transport(
-                ReqwestHttpReplicaV2Transport::create("http://localhost:64218")
+                ReqwestHttpReplicaV2Transport::create("http://localhost:57862")
                     .expect("transport error"),
             )
             .with_identity(get_dfx_identity("default"))

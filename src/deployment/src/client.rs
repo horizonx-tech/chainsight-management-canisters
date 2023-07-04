@@ -59,10 +59,7 @@ impl Client {
     pub fn new(agent: Agent) -> Self {
         Self { agent }
     }
-    pub async fn create_canister(
-        &self,
-        effective_canister_id: Principal,
-    ) -> Result<Principal, Box<dyn Error>> {
+    pub async fn create_canister(&self) -> Result<Principal, Box<dyn Error>> {
         #[derive(CandidType)]
         struct Argument {
             amount: Option<Nat>,
@@ -80,7 +77,6 @@ impl Client {
                 &management_canister_id,
                 "provisional_create_canister_with_cycles",
             )
-            .with_effective_canister_id(effective_canister_id)
             .with_arg(&Encode!(&Argument { amount: None })?)
             .call_and_wait()
             .await?;

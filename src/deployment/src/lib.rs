@@ -18,7 +18,7 @@ struct CreateCanisterResult {
 pub struct DeployResult {
     pub initializer: Principal,
     pub proxy: Principal,
-    pub registry: Principal,
+    //    pub registry: Principal,
 }
 
 //pub const INITIALIZER_CANISTER_ID: &str = "c2lt4-zmaaa-aaaaa-qaaiq-cai";
@@ -28,25 +28,25 @@ const INITIALIZER_WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/initializer.wasm");
 const PROXY_WASM: &[u8] =
     include_bytes!("../../../target/wasm32-unknown-unknown/release/proxy.wasm");
-const REGISTRY_WASM: &[u8] =
-    include_bytes!("../../../target/wasm32-unknown-unknown/release/registry.wasm");
+//const REGISTRY_WASM: &[u8] =
+//    include_bytes!("../../../target/wasm32-unknown-unknown/release/registry.wasm");
 
 pub async fn deploy(agent: Agent) -> Result<DeployResult, Box<dyn Error>> {
     let client = Client::new(agent);
     let initializer_canister = client.create_canister().await?;
     let proxy_canister = client.create_canister().await?;
-    let registry_canister = client.create_canister().await?;
+    //let registry_canister = client.create_canister().await?;
     client
         .install_code(initializer_canister, INITIALIZER_WASM)
         .await?;
     client.install_code(proxy_canister, PROXY_WASM).await?;
-    client
-        .install_code(registry_canister, REGISTRY_WASM)
-        .await?;
+    //client
+    //    .install_code(registry_canister, REGISTRY_WASM)
+    //    .await?;
     Ok(DeployResult {
         initializer: initializer_canister,
         proxy: proxy_canister,
-        registry: registry_canister,
+        //   registry: registry_canister,
     })
 }
 pub fn get_dfx_identity(name: &str) -> Secp256k1Identity {

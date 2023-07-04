@@ -1,4 +1,4 @@
-use std::{error::Error, slice::Iter};
+use std::error::Error;
 
 use candid::{CandidType, Decode, Encode, Nat, Principal};
 use ic_agent::Agent;
@@ -53,16 +53,6 @@ pub struct CreateCanisterArgs {
 #[derive(CandidType, Deserialize)]
 pub struct CreateResult {
     canister_id: Principal,
-}
-impl CanisterInstallMode {
-    pub fn iter() -> Iter<'static, CanisterInstallMode> {
-        static MODES: [CanisterInstallMode; 3] = [
-            CanisterInstallMode::Install,
-            CanisterInstallMode::Reinstall,
-            CanisterInstallMode::Upgrade,
-        ];
-        MODES.iter()
-    }
 }
 
 impl Client {

@@ -21,11 +21,11 @@ struct Canister {
 }
 
 thread_local! {
-    static REGISTRY: RefCell<String> = RefCell::new(String::new());
+    static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
 fn registry() -> Principal {
-    REGISTRY.with(|registry| Principal::from_str(&registry.borrow()).unwrap())
+    REGISTRY.with(|registry| registry.borrow().clone())
 }
 
 #[update]
@@ -115,8 +115,7 @@ async fn _put_call_log(call_from: Principal, call_to: Principal) {
 }
 
 #[update]
-fn set_registry(id: String) {
-    Principal::from_str(&id).unwrap();
+fn set_registry(id: Principal) {
     REGISTRY.with(|registry| {
         *registry.borrow_mut() = id;
     });

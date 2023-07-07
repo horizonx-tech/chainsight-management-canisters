@@ -29,6 +29,7 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     type CanisterRepositoryIFace = {
         put : (canister : Canister.Canister) -> async ();
         get : (principal : Principal) -> async (?Canister.Canister);
+        list : (lower : Text, upper : Text) -> async ([Canister.Canister]);
     };
     type LogRepositoryIFace = {
         put : Log.CallLog -> async ();
@@ -116,6 +117,10 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
             case null { Principal.fromText("") };
             case (?config) { Principal.fromText(config.value) };
         };
+    };
+
+    public shared func scanCanisters() : async [Canister.Canister] {
+        await listCanisterRepositories()[0].list("0", "zzzzz-zzzzz-zzzzz-zzzzz-zzz");
     };
 
     public shared (msg) func init() : async [?Text] {

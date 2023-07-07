@@ -1,7 +1,7 @@
 type Time = int;
 type ProxyCanister = service {
     list_logs : (principal, Time, Time) -> (vec CallLog);
-    set_registry : (text) -> ();
+    set_registry : (principal) -> ();
     put_call_log : (principal) -> ();
     register : (text, text) -> ();
     proxy_call : (principal, principal, text, vec nat8) -> (vec nat8);

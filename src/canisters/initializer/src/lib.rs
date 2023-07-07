@@ -13,7 +13,7 @@ use ic_cdk::{
             provisional::{CanisterIdRecord, CanisterSettings},
         },
     },
-    update,
+    query, update,
 };
 
 #[cfg(debug_cfg)]
@@ -24,11 +24,11 @@ const VAULT_WASM: &[u8] =
     include_bytes!("../../../../target/wasm32-unknown-unknown/release/vault.wasm");
 
 thread_local! {
-    static REGISTRY: RefCell<String> = RefCell::new(String::new());
+    static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
 fn registry() -> Principal {
-    REGISTRY.with(|registry| Principal::from_str(&registry.borrow()).unwrap())
+    REGISTRY.with(|r| r.borrow().clone())
 }
 
 #[update]
@@ -43,6 +43,11 @@ async fn deploy_vault_of(principal: Principal) -> Principal {
 #[update]
 async fn get_proxy() -> Principal {
     _get_proxy().await
+}
+
+#[query]
+async fn get_registry() -> Principal {
+    registry()
 }
 
 async fn _get_proxy() -> Principal {
@@ -87,14 +92,14 @@ async fn create_new_canister() -> CallResult<Principal> {
 }
 
 #[update]
-fn set_registry(id: String) {
-    Principal::from_str(&id).unwrap();
+fn set_registry(id: Principal) {
     REGISTRY.with(|registry| {
         *registry.borrow_mut() = id;
     });
 }
 
 async fn register(principal: Principal, vault: Principal) {
+    let reg = registry();
     let _: CallResult<()> =
-        ic_cdk::api::call::call(registry(), "registerCanister", (principal, vault)).await;
+        ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
 }

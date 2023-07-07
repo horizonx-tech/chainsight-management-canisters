@@ -40,6 +40,16 @@ async fn deploy_vault_of(principal: Principal) -> Principal {
     p
 }
 
+#[update]
+async fn get_proxy() -> Principal {
+    _get_proxy().await
+}
+
+async fn _get_proxy() -> Principal {
+    let px: CallResult<(Principal,)> = ic_cdk::api::call::call(registry(), "getProxy", ()).await;
+    px.unwrap().0
+}
+
 async fn install(created: &Principal, canister: &Principal) -> CallResult<()> {
     let canister_id = created.clone();
 

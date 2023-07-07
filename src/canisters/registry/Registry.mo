@@ -17,6 +17,8 @@ import Array "mo:base/Array";
 import Log "log/Log";
 import LogRepository "log/LogRepository";
 import Time "mo:base/Time";
+import ConfigRepository "configs/ConfigRepository";
+import Config "configs/Config";
 
 shared ({ caller = owner }) actor class RegistryCanister() = this {
     type DB = actor {
@@ -31,6 +33,10 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     type LogRepositoryIFace = {
         put : Log.CallLog -> async ();
         list : (canister : Principal, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
+    };
+    type ConfigRepositoryIFace = {
+        put : (config : Config.Config) -> async ();
+        get : (id : Text) -> async (?Config.Config);
     };
 
     func listLogRepositories() : [LogRepositoryIFace] {
@@ -51,6 +57,17 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
             func(canisterId) {
                 let act = actor (canisterId) : DB;
                 CanisterRepository.Repository(act);
+            },
+        );
+    };
+
+    func listConfigRepositories() : [ConfigRepositoryIFace] {
+        let canisterIds = getCanisterIdsIfExists("Configs");
+        Array.map<Text, ConfigRepositoryIFace>(
+            canisterIds,
+            func(canisterId) {
+                let act = actor (canisterId) : DB;
+                ConfigRepository.Repository(act);
             },
         );
     };
@@ -88,12 +105,26 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         return false;
     };
 
+    public shared (msg) func registerProxy(proxy : Principal) {
+        assert (owner == msg.caller);
+        await listConfigRepositories()[0].put(Config.newProxy(proxy));
+    };
+
+    public shared func getProxy() : async Principal {
+        let config = await listConfigRepositories()[0].get("proxy");
+        switch (config) {
+            case null { Principal.fromText("") };
+            case (?config) { Principal.fromText(config.value) };
+        };
+    };
+
     public shared (msg) func init() : async [?Text] {
         assert (owner == msg.caller);
         ([
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
             await createServiceCanister("Vaults"),
+            await createServiceCanister("Configs"),
         ]);
     };
 

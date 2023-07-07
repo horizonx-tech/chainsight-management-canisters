@@ -1,5 +1,6 @@
 type Time = int;
 type InitializerCanister = service {
     deploy_vault_of : (principal) -> (principal);
+    get_proxy : () -> (principal);
 };
 service : () -> InitializerCanister;

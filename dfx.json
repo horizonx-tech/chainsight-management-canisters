@@ -6,8 +6,7 @@
       "main": "src/canisters/registry/Registry.mo",
       "declarations": {
         "node_compatibility": true
-      },
-      "post_install": ["dfx canister call _management_canister_registry init"]
+      }
     },
     "_management_canister_initializer": {
       "type": "rust",

@@ -2,6 +2,7 @@
   "version": 1,
   "canisters": {
     "_management_canister_registry": {
+      "gzip": true,
       "type": "motoko",
       "main": "src/canisters/registry/Registry.mo",
       "declarations": {
@@ -9,16 +10,19 @@
       }
     },
     "_management_canister_initializer": {
+      "gzip": true,
       "type": "rust",
       "candid": "src/canisters/initializer/initializer.did",
       "package": "initializer"
     },
     "_management_canister_vault": {
+      "gzip": true,
       "type": "rust",
       "candid": "src/canisters/vault/vault.did",
       "package": "vault"
     },
     "_management_canister_proxy": {
+      "gzip": true,
       "type": "rust",
       "candid": "src/canisters/proxy/proxy.did",
       "package": "proxy",

@@ -7,7 +7,6 @@ import Text "mo:base/Text";
 import CA "mo:candb/CanisterActions";
 import CanisterMap "mo:candb/CanisterMap";
 import Utils "mo:candb/Utils";
-import Buffer "mo:stable-buffer/StableBuffer";
 import DB "./db/DB";
 import Canister "canister/Canister";
 import CanDB "mo:candb/CanDB";
@@ -19,6 +18,7 @@ import LogRepository "log/LogRepository";
 import Time "mo:base/Time";
 import ConfigRepository "configs/ConfigRepository";
 import Config "configs/Config";
+import Buffer "mo:stable-buffer/StableBuffer";
 
 shared ({ caller = owner }) actor class RegistryCanister() = this {
     type DB = actor {
@@ -41,52 +41,57 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     };
 
     func listLogRepositories() : [LogRepositoryIFace] {
-        let canisterIds = getCanisterIdsIfExists("Logs");
         Array.map<Text, LogRepositoryIFace>(
-            canisterIds,
+            getCanisterIdsIfExists("Logs"),
             func(canisterId) {
-                let act = actor (canisterId) : DB;
-                LogRepository.Repository(act);
+                logRepository(canisterId);
             },
         );
     };
 
+    func logRepository(canisterId : Text) : LogRepositoryIFace {
+        return LogRepository.Repository(db(canisterId));
+    };
+
+    func configRepository(canisterId : Text) : ConfigRepositoryIFace {
+        return ConfigRepository.Repository(db(canisterId));
+    };
+
+    func canisterRepository(canisterId : Text) : CanisterRepositoryIFace {
+        return CanisterRepository.Repository(db(canisterId));
+    };
+
+    func db(canisterId : Text) : DB {
+        actor (canisterId) : DB;
+    };
+
     func listCanisterRepositories() : [CanisterRepositoryIFace] {
-        let canisterIds = getCanisterIdsIfExists("Canisters");
         Array.map<Text, CanisterRepositoryIFace>(
-            canisterIds,
+            getCanisterIdsIfExists("Canisters"),
             func(canisterId) {
-                let act = actor (canisterId) : DB;
-                CanisterRepository.Repository(act);
+                canisterRepository(canisterId);
             },
         );
     };
 
     func listConfigRepositories() : [ConfigRepositoryIFace] {
-        let canisterIds = getCanisterIdsIfExists("Configs");
         Array.map<Text, ConfigRepositoryIFace>(
-            canisterIds,
+            getCanisterIdsIfExists("Configs"),
             func(canisterId) {
-                let act = actor (canisterId) : DB;
-                ConfigRepository.Repository(act);
+                configRepository(canisterId);
             },
         );
     };
 
-    public shared func debug_put() : async () {
-        await listCanisterRepositories()[0].put(Canister.newCanister(Principal.fromActor(this), Principal.fromActor(this)));
-    };
-
     public shared func registerCanister(principal : Principal, vault : Principal) : async () {
-        await listCanisterRepositories()[0].put(Canister.newCanister(principal, vault));
-    };
-
-    public shared func get() : async ?Canister.Canister {
-        await listCanisterRepositories()[0].get(Principal.fromActor(this));
-    };
-
-    public shared func debugPutLog() : async () {
-        await listLogRepositories()[0].put(Log.newCallLog(Principal.fromActor(this), Principal.fromActor(this)));
+        switch (putDestination("Canisters")) {
+            case null {
+                Debug.trap("No canister registry found");
+            };
+            case (?dest) {
+                await canisterRepository(dest).put(Canister.newCanister(principal, vault));
+            };
+        };
     };
 
     public shared func putLog(caller : Principal, callTo : Principal) : async () {
@@ -95,6 +100,15 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
 
     public shared func listLogsOf(principal : Principal, from : Time.Time, to : Time.Time) : async ([Log.CallLog]) {
         await listLogRepositories()[0].list(principal, from, ?to);
+    };
+
+    func putDestination(pk : Text) : ?Text {
+        let canisterIds = getCanisterIdsIfExists(pk);
+        let length = canisterIds.size();
+        if (length == 0) {
+            return null;
+        };
+        return ?canisterIds[length - 1];
     };
 
     public shared func exists(principal : Principal) : async Bool {
@@ -108,19 +122,37 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
 
     public shared (msg) func registerProxy(proxy : Principal) {
         assert (owner == msg.caller);
-        await listConfigRepositories()[0].put(Config.newProxy(proxy));
-    };
-
-    public shared func getProxy() : async Principal {
-        let config = await listConfigRepositories()[0].get("proxy");
-        switch (config) {
-            case null { Principal.fromText("") };
-            case (?config) { Principal.fromText(config.value) };
+        switch (putDestination("Configs")) {
+            case null {
+                Debug.trap("No config registry found");
+            };
+            case (?dest) {
+                await configRepository(dest).put(Config.newProxy(proxy));
+            };
         };
     };
 
+    public shared func getProxy() : async Principal {
+        for (repo in listConfigRepositories().vals()) {
+            let config = await repo.get("proxy");
+            switch (config) {
+                case (null) {};
+                case (?config) { return Principal.fromText(config.value) };
+            };
+        };
+        return Principal.fromText("");
+    };
+
     public shared func scanCanisters() : async [Canister.Canister] {
-        await listCanisterRepositories()[0].list("0", "zzzzz-zzzzz-zzzzz-zzzzz-zzz");
+        let res = Buffer.init<Canister.Canister>();
+        for (repo in listCanisterRepositories().vals()) {
+            let canisters = await repo.list("0", "zzzzz-zzzzz-zzzzz-zzzzz-zzz");
+            Buffer.append(
+                res,
+                Buffer.fromArray<Canister.Canister>(canisters),
+            );
+        };
+        return Buffer.toArray(res);
     };
 
     public shared (msg) func init() : async [?Text] {
@@ -192,7 +224,7 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
             partitionKey = pk;
             scalingOptions = {
                 autoScalingHook = autoScaleServiceCanister;
-                sizeLimit = #heapSize(475_000_000); // Scale out at 475MB
+                sizeLimit = #heapSize(950_000_000); // Scale out at 950MB
                 // for auto-scaling testing
                 //sizeLimit = #count(3); // Scale out at 3 entities inserted
             };

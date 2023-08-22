@@ -107,6 +107,7 @@ fn set_canister(principal: Principal) -> bool {
     }
 }
 
+#[query]
 fn target_canister() -> Principal {
     CHAINSIGHT_CANISTER_ID.with(|c| Principal::from_str(c.borrow().get().as_str()).unwrap())
 }

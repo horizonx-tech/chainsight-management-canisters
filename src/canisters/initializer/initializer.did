@@ -1,6 +1,10 @@
 type Time = int;
+type InitializeOutput = record {
+    proxy : principal;
+    db : principal;
+};
 type InitializerCanister = service {
-    deploy_vault_of : (principal) -> (principal);
+    initialize : () -> (InitializeOutput);
     get_proxy : () -> (principal);
     get_registry : () -> (principal);
     set_registry : (principal) -> ();

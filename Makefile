@@ -12,11 +12,11 @@ create:
 
 install:	
 	dfx deploy _management_canister_initializer --network http://localhost:$(port)
-	dfx deploy _management_canister_proxy --network http://localhost:$(port)
 	dfx deploy _management_canister_registry --network http://localhost:$(port)
 	dfx canister call _management_canister_registry init --network http://localhost:$(port)
-	dfx canister call _management_canister_proxy set_registry '(principal "uh54g-lyaaa-aaaal-achca-cai")' --network http://localhost:$(port)
 	dfx canister call _management_canister_initializer set_registry '(principal "uh54g-lyaaa-aaaal-achca-cai")' --network http://localhost:$(port)
 	dfx canister call _management_canister_registry registerProxy '(principal "u3zgx-4yaaa-aaaal-achaa-cai")' --network http://localhost:$(port)
 local:
 	make create install
+	dfx canister deposit-cycles 30000000000000 _management_canister_initializer
+

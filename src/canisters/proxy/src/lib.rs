@@ -1,9 +1,9 @@
-use std::{cell::RefCell, str::FromStr};
+use std::cell::RefCell;
 
 use candid::{CandidType, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
-    update,
+    query, update,
 };
 use serde::{Deserialize, Serialize};
 
@@ -22,16 +22,52 @@ struct Canister {
 
 thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static TARGET: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static DB: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
 }
 
-fn registry() -> Principal {
+#[query]
+fn db() -> Principal {
+    _db()
+}
+fn _registry() -> Principal {
     REGISTRY.with(|registry| registry.borrow().clone())
 }
 
+#[query]
+fn registry() -> Principal {
+    _registry()
+}
+fn _target() -> Principal {
+    TARGET.with(|target| target.borrow().clone())
+}
+
+#[query]
+fn target() -> Principal {
+    _target()
+}
+fn _db() -> Principal {
+    DB.with(|db| db.borrow().clone())
+}
+
+#[ic_cdk::init]
+fn init(registry: Principal, target: Principal, db: Principal) {
+    REGISTRY.with(|r| {
+        *r.borrow_mut() = registry;
+    });
+    TARGET.with(|t| {
+        *t.borrow_mut() = target;
+    });
+    DB.with(|d| {
+        *d.borrow_mut() = db;
+    });
+}
+
 #[update]
-async fn list_logs(principal: Principal, from: Int, to: Int) -> Vec<CallLog> {
+async fn list_logs(from: Int, to: Int) -> Vec<CallLog> {
     let call_result: CallResult<(Vec<CallLog>,)> =
-        ic_cdk::api::call::call(registry(), "listLogsOf", (principal, from, to)).await;
+        ic_cdk::api::call::call(_registry(), "listLogsOf", (_target(), from, to)).await;
     match call_result {
         Ok((logs,)) => logs,
         Err(err) => {
@@ -41,35 +77,16 @@ async fn list_logs(principal: Principal, from: Int, to: Int) -> Vec<CallLog> {
     }
 }
 
-#[update]
-async fn publish_call(from: Principal, id: Principal, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
-    let result = _proxy_call(from, id, "on_update".to_string(), args).await;
-    _put_call_log(id, from).await;
-    result
-}
-
-async fn _proxy_call(
-    from: Principal,
-    id: Principal,
-    method: String,
-    args: Vec<u8>,
-) -> CallResult<(Vec<u8>,)> {
-    if !canister_exists(from).await {
-        ic_cdk::println!("Unknown canster: {:?}", id.to_string());
+async fn _proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
+    if !canister_exists(ic_cdk::caller()).await {
+        ic_cdk::println!("Unknown canster: {:?}", ic_cdk::caller().to_string());
         return Err((
-            RejectionCode::DestinationInvalid,
-            format!("Unknown canister: {}", id.to_string()),
-        ));
-    }
-    if !canister_exists(id).await {
-        ic_cdk::println!("Unknown canster: {:?}", id.to_string());
-        return Err((
-            RejectionCode::DestinationInvalid,
-            format!("Unknown canister: {}", id.to_string()),
+            RejectionCode::CanisterReject,
+            format!("Unknown canister: {}", ic_cdk::caller().to_string()),
         ));
     }
     let result: CallResult<(Vec<u8>,)> =
-        ic_cdk::api::call::call(id, method.as_str(), (args,)).await;
+        ic_cdk::api::call::call(_target(), method.as_str(), (args,)).await;
     if result.is_err() {
         ic_cdk::println!("Error: {:?}", result);
     }
@@ -77,37 +94,37 @@ async fn _proxy_call(
 }
 
 #[update]
-async fn proxy_call(
-    from: Principal,
-    id: Principal,
-    method: String,
-    args: Vec<u8>,
-) -> CallResult<(Vec<u8>,)> {
-    let result = _proxy_call(from, id, method, args).await;
-    _put_call_log(from, id).await;
+async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
+    let result = _proxy_call(method, args).await;
+    _put_call_log().await;
     result
 }
 
 async fn canister_exists(id: Principal) -> bool {
-    let result: CallResult<(bool,)> = ic_cdk::api::call::call(registry(), "exists", (id,)).await;
-    //match result {
-    //    Ok(result) => result.0,
-    //    Err(e) => {
-    //        ic_cdk::println!("Error: {:?}", e);
-    //        false
-    //    }
-    //}
-    true
+    let known = KNOWN_CANISTERS.with(|canisters| canisters.borrow().contains(&id));
+    if known {
+        return true;
+    }
+    // TODO: This line can be a single-point-of-failure.
+    let result: CallResult<(bool,)> = ic_cdk::api::call::call(_registry(), "exists", (id,)).await;
+    match result {
+        Ok((exists,)) => match exists {
+            true => {
+                KNOWN_CANISTERS.with(|canisters| canisters.borrow_mut().push(id));
+                true
+            }
+            false => false,
+        },
+        Err(err) => {
+            ic_cdk::println!("Error: {:?}", err);
+            false
+        }
+    }
 }
 
-#[update]
-async fn put_call_log(call_to: Principal) {
-    _put_call_log(ic_cdk::caller(), call_to).await;
-}
-
-async fn _put_call_log(call_from: Principal, call_to: Principal) {
+async fn _put_call_log() {
     let result: CallResult<()> =
-        ic_cdk::api::call::call(registry(), "putLog", (call_from, call_to)).await;
+        ic_cdk::api::call::call(_db(), "putLog", (ic_cdk::caller(), _target())).await;
     match result {
         Err(e) => ic_cdk::println!("Error: {:?}", e),
         _ => (),

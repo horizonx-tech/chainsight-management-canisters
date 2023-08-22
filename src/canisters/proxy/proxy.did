@@ -5,6 +5,9 @@ type ProxyCanister = service {
     put_call_log : (principal) -> ();
     register : (text, text) -> ();
     proxy_call : (principal, principal, text, vec nat8) -> (vec nat8);
+    db : () -> (principal) query;
+    target : () -> (principal) query;
+    registry : () -> (principal) query;
 };
 type Canister = record { "principal" : principal };
 type CallLog = record {

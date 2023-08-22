@@ -101,25 +101,27 @@ async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
 }
 
 async fn canister_exists(id: Principal) -> bool {
-    let known = KNOWN_CANISTERS.with(|canisters| canisters.borrow().contains(&id));
-    if known {
-        return true;
-    }
-    // TODO: This line can be a single-point-of-failure.
-    let result: CallResult<(bool,)> = ic_cdk::api::call::call(_registry(), "exists", (id,)).await;
-    match result {
-        Ok((exists,)) => match exists {
-            true => {
-                KNOWN_CANISTERS.with(|canisters| canisters.borrow_mut().push(id));
-                true
-            }
-            false => false,
-        },
-        Err(err) => {
-            ic_cdk::println!("Error: {:?}", err);
-            false
-        }
-    }
+    // TODO: payment
+    true
+    //let known = KNOWN_CANISTERS.with(|canisters| canisters.borrow().contains(&id));
+    //if known {
+    //    return true;
+    //}
+    //// TODO: This line can be a single-point-of-failure.
+    //let result: CallResult<(bool,)> = ic_cdk::api::call::call(_registry(), "exists", (id,)).await;
+    //match result {
+    //    Ok((exists,)) => match exists {
+    //        true => {
+    //            KNOWN_CANISTERS.with(|canisters| canisters.borrow_mut().push(id));
+    //            true
+    //        }
+    //        false => false,
+    //    },
+    //    Err(err) => {
+    //        ic_cdk::println!("Error: {:?}", err);
+    //        false
+    //    }
+    //}
 }
 
 async fn _put_call_log() {

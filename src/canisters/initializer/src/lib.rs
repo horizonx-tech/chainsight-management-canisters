@@ -18,8 +18,8 @@ use ic_cdk::{
 
 #[derive(CandidType, serde::Deserialize, Clone, Copy)]
 pub struct InitializeOutput {
-    proxy: Principal,
-    db: Principal,
+    pub proxy: Principal,
+    pub db: Principal,
 }
 
 #[cfg(debug_cfg)]

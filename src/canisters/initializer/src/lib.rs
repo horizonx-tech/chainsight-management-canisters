@@ -50,14 +50,30 @@ async fn initialize() -> InitializeOutput {
     let principal = ic_cdk::caller();
     let vault = create_new_canister().await.unwrap();
     install_vault(&vault, &principal).await.unwrap();
-    after_install(&vault).await.unwrap();
+    after_install(&vault, 300_000_000_000).await.unwrap();
     register(principal, vault).await;
+    ic_cdk::println!(
+        "Vault of {:?} installed at {:?}",
+        principal.to_string(),
+        vault.to_string()
+    );
     let db = create_new_canister().await.unwrap();
     install_db(db).await.unwrap();
-    after_install(&db).await.unwrap();
+    after_install(&db, 3_000_000_000_000).await.unwrap();
+    ic_cdk::println!(
+        "DB of {:?} installed at {:?}",
+        principal.to_string(),
+        db.to_string()
+    );
+    init_db(db).await.unwrap();
     let proxy = create_new_canister().await.unwrap();
     install_proxy(proxy, principal, db).await.unwrap();
-    after_install(&proxy).await.unwrap();
+    after_install(&proxy, 300_000_000_000).await.unwrap();
+    ic_cdk::println!(
+        "Proxy of {:?} installed at {:?}",
+        principal.to_string(),
+        proxy.to_string()
+    );
     InitializeOutput { proxy, db }
 }
 
@@ -81,6 +97,11 @@ async fn install_db(created: Principal) -> CallResult<()> {
     _install(canister_id, DB_WASM.to_vec(), encode_args(()).unwrap()).await
 }
 
+async fn init_db(db: Principal) -> CallResult<()> {
+    let out: CallResult<()> = ic_cdk::api::call::call(db, "init", ()).await;
+    out
+}
+
 async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
     install_code(InstallCodeArgument {
         mode: CanisterInstallMode::Reinstall,
@@ -102,9 +123,9 @@ async fn install_proxy(created: Principal, target: Principal, db: Principal) -> 
     .await
 }
 
-async fn after_install(canister_id: &Principal) -> CallResult<()> {
+async fn after_install(canister_id: &Principal, deposit: u128) -> CallResult<()> {
     let canister_id = canister_id.clone();
-    deposit_cycles(CanisterIdRecord { canister_id }, 300_000_000_000).await?;
+    deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id,
         settings: CanisterSettings {

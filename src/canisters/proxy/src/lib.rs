@@ -77,14 +77,15 @@ async fn list_logs(from: Int, to: Int) -> Vec<CallLog> {
     }
 }
 
-async fn _proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
-    if !canister_exists(ic_cdk::caller()).await {
-        ic_cdk::println!("Unknown canster: {:?}", ic_cdk::caller().to_string());
+async fn _proxy_call(caller: Principal, method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
+    if !canister_exists(caller).await {
+        ic_cdk::println!("Unknown canster: {:?}", caller.to_string());
         return Err((
             RejectionCode::CanisterReject,
-            format!("Unknown canister: {}", ic_cdk::caller().to_string()),
+            format!("Unknown canister: {}", caller.to_string()),
         ));
     }
+    ic_cdk::println!("proxy call method: {}", method.as_str());
     let result: CallResult<(Vec<u8>,)> =
         ic_cdk::api::call::call(_target(), method.as_str(), (args,)).await;
     if result.is_err() {
@@ -95,8 +96,9 @@ async fn _proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
 
 #[update]
 async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
-    let result = _proxy_call(method, args).await;
-    _put_call_log().await;
+    let caller = ic_cdk::caller();
+    let result = _proxy_call(caller, method, args).await;
+    _put_call_log(caller).await;
     result
 }
 
@@ -124,9 +126,9 @@ async fn canister_exists(id: Principal) -> bool {
     //}
 }
 
-async fn _put_call_log() {
+async fn _put_call_log(caller: Principal) {
     let result: CallResult<()> =
-        ic_cdk::api::call::call(_db(), "putLog", (ic_cdk::caller(), _target())).await;
+        ic_cdk::api::call::call(_db(), "putLog", (caller, _target())).await;
     match result {
         Err(e) => ic_cdk::println!("Error: {:?}", e),
         _ => (),

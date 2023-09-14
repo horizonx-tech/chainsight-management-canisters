@@ -67,7 +67,7 @@ async fn initialize() -> InitializeOutput {
     );
     init_db(db).await.unwrap();
     let proxy = create_new_canister().await.unwrap();
-    install_proxy(proxy, principal, db).await.unwrap();
+    install_proxy(proxy, vault, principal, db).await.unwrap();
     after_install(&proxy, 300_000_000_000).await.unwrap();
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
@@ -112,13 +112,18 @@ async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) ->
     .await
 }
 
-async fn install_proxy(created: Principal, target: Principal, db: Principal) -> CallResult<()> {
+async fn install_proxy(
+    created: Principal,
+    vault: Principal,
+    target: Principal,
+    db: Principal,
+) -> CallResult<()> {
     let canister_id = created.clone();
     let registry = get_registry();
     _install(
         canister_id,
         PROXY_WASM.to_vec(),
-        encode_args((registry, target, db)).unwrap(),
+        encode_args((registry, vault, target, db)).unwrap(),
     )
     .await
 }

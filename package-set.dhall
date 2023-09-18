@@ -19,12 +19,12 @@ let packages = [
   , dependencies = [ "base" ]
   },
   { name = "candb"
-  , repo = "git@github.com:canscale/CanDB.git"
+  , repo = "https://github.com/canscale/CanDB.git"
   , version = "beta"
   , dependencies = [ "base" ]
   },
   { name = "candy"
-  , repo = "git@github.com:icdevs/candy_library.git"
+  , repo = "https://github.com/icdevs/candy_library.git"
   , version = "0.2.0"
   , dependencies = [ "base" ]
   },

@@ -48,27 +48,27 @@ fn registry() -> Principal {
 #[update]
 async fn initialize() -> InitializeOutput {
     let principal = ic_cdk::caller();
-    let vault = create_new_canister().await.unwrap();
+    let vault = create_new_canister(300_000_000_000).await.unwrap();
     install_vault(&vault, &principal).await.unwrap();
-    after_install(&vault, 300_000_000_000).await.unwrap();
+    after_install(&vault).await.unwrap();
     register(principal, vault).await;
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
         principal.to_string(),
         vault.to_string()
     );
-    let db = create_new_canister().await.unwrap();
+    let db = create_new_canister(3_000_000_000_000).await.unwrap();
     install_db(db).await.unwrap();
-    after_install(&db, 3_000_000_000_000).await.unwrap();
+    after_install(&db).await.unwrap();
     ic_cdk::println!(
         "DB of {:?} installed at {:?}",
         principal.to_string(),
         db.to_string()
     );
     init_db(db).await.unwrap();
-    let proxy = create_new_canister().await.unwrap();
+    let proxy = create_new_canister(300_000_000_000).await.unwrap();
     install_proxy(proxy, principal, db).await.unwrap();
-    after_install(&proxy, 300_000_000_000).await.unwrap();
+    after_install(&proxy).await.unwrap();
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
         principal.to_string(),
@@ -123,9 +123,8 @@ async fn install_proxy(created: Principal, target: Principal, db: Principal) -> 
     .await
 }
 
-async fn after_install(canister_id: &Principal, deposit: u128) -> CallResult<()> {
+async fn after_install(canister_id: &Principal) -> CallResult<()> {
     let canister_id = canister_id.clone();
-    deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id,
         settings: CanisterSettings {
@@ -138,11 +137,12 @@ async fn after_install(canister_id: &Principal, deposit: u128) -> CallResult<()>
     .await
 }
 
-async fn create_new_canister() -> CallResult<Principal> {
+async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
     let canister_id = create_canister(CreateCanisterArgument { settings: None })
         .await?
         .0
         .canister_id;
+    deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
     Ok(canister_id)
 }
 

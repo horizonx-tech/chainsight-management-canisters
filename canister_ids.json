@@ -1,17 +1,12 @@
 {
   "_management_canister_initializer": {
-    "ic": "lhgjz-jqaaa-aaaap-qbqiq-cai"
+    "ic": "fljmk-caaaa-aaaap-qbrjq-cai"
   },
-  "_management_canister_proxy": {
-    "ic": "lofcf-7yaaa-aaaap-qbqja-cai"
-  },
+  "_management_canister_proxy": {},
   "_management_canister_registry": {
-    "ic": "l4dv4-tiaaa-aaaap-qbqka-cai"
-  },
-  "_management_canister_registry_prod": {
-    "ic": "ljeer-saaaa-aaaap-qbqjq-cai"
+    "ic": "f6o5h-diaaa-aaaap-qbrka-cai"
   },
   "_management_canister_vault": {
-    "ic": "l3cti-6qaaa-aaaap-qbqkq-cai"
+    "ic": "ga72j-eyaaa-aaaap-qbrda-cai"
   }
 }

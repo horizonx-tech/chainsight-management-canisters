@@ -1,10 +1,11 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, default};
 
 use candid::{CandidType, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
     query, update,
 };
+use ic_cdk_timers::TimerId;
 use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -20,11 +21,36 @@ struct Canister {
     principal: Principal,
 }
 
+#[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
+pub struct IndexingConfig {
+    pub task_interval_secs: u32,
+    pub method: String,
+    pub args: Vec<u8>,
+}
+
+#[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
+pub struct ExecutionResult {
+    pub is_succeeded: bool,
+    pub timestamp: u64,
+    pub error: Option<Error>,
+}
+
+#[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
+pub struct Error {
+    pub message: String,
+    // pub backtrace: String,
+}
+
 thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static TARGET: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static DB: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
+    static TIMER_ID: RefCell<TimerId> = RefCell::new(TimerId::default());
+    static INDEXING_CONFIG: std::cell::RefCell<IndexingConfig> = std::cell::RefCell::new(IndexingConfig::default());
+    static LAST_SUCCEEDED: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
+    static LAST_EXECUTION_RESULT: std::cell::RefCell<ExecutionResult> = std::cell::RefCell::new(ExecutionResult::default());
+    static NEXT_SCHEDULE: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
 }
 
 #[query]
@@ -139,5 +165,99 @@ async fn _put_call_log(caller: Principal) {
 fn set_registry(id: Principal) {
     REGISTRY.with(|registry| {
         *registry.borrow_mut() = id;
+    });
+}
+
+#[query]
+fn last_succeeded() -> u64 {
+    LAST_SUCCEEDED.with(|x| *x.borrow())
+}
+
+#[query]
+fn last_execution_result() -> ExecutionResult {
+    LAST_EXECUTION_RESULT.with(|x| x.borrow().clone())
+}
+
+#[query]
+fn next_schedule() -> u64 {
+    NEXT_SCHEDULE.with(|f| *f.borrow())
+}
+
+fn set_next_schedule(time: u64) {
+    NEXT_SCHEDULE.with(|f| *f.borrow_mut() = time);
+}
+
+#[query]
+fn get_indexing_config() -> IndexingConfig {
+    INDEXING_CONFIG.with(|f| f.borrow().clone())
+}
+
+fn set_indexing_config(config: IndexingConfig) {
+    INDEXING_CONFIG.with(|f| *f.borrow_mut() = config);
+}
+
+#[query]
+fn get_timer_id() -> String {
+    format!("{:?}", TIMER_ID.with(|f| f.borrow().clone()))
+}
+
+fn set_timer_id(timer_id: TimerId) {
+    TIMER_ID.with(|f| *f.borrow_mut() = timer_id);
+}
+
+#[update]
+pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, args: Vec<u8>) {
+    if ic_cdk::caller() != _target() {
+        panic!("Not permitted")
+    }
+    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
+    let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
+    let delay =
+        round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
+            - current_time_sec;
+    set_indexing_config(IndexingConfig {
+        task_interval_secs,
+        method,
+        args,
+    });
+    set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
+    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+        let timer_id = ic_cdk_timers::set_timer_interval(
+            std::time::Duration::from_secs(task_interval_secs as u64),
+            || {
+                ic_cdk::spawn(async move { index().await });
+            },
+        );
+        set_timer_id(timer_id);
+    });
+}
+
+async fn index() {
+    let config = get_indexing_config();
+    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
+    set_next_schedule((current_time_sec + config.task_interval_secs) as u64);
+
+    let result: CallResult<(Vec<u8>,)> =
+        ic_cdk::api::call::call(_target(), config.method.as_str(), (config.args,)).await;
+    if result.is_ok() {
+        update_last_execution_result(None);
+    } else {
+        update_last_execution_result(Some(Error {
+            message: format!("{:?}", result),
+        }));
+    }
+}
+
+fn update_last_execution_result(error: Option<Error>) {
+    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u64;
+    if error.is_none() {
+        LAST_SUCCEEDED.with(|x| *x.borrow_mut() = current_time_sec);
+    }
+    LAST_EXECUTION_RESULT.with(|x| {
+        *x.borrow_mut() = ExecutionResult {
+            is_succeeded: error.is_none(),
+            timestamp: current_time_sec,
+            error,
+        }
     });
 }

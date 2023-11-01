@@ -46,7 +46,6 @@ thread_local! {
     static TARGET: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static DB: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
-    static TIMER_ID: RefCell<TimerId> = RefCell::new(TimerId::default());
     static INDEXING_CONFIG: std::cell::RefCell<IndexingConfig> = std::cell::RefCell::new(IndexingConfig::default());
     static LAST_SUCCEEDED: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
     static LAST_EXECUTION_RESULT: std::cell::RefCell<ExecutionResult> = std::cell::RefCell::new(ExecutionResult::default());
@@ -196,15 +195,6 @@ fn set_indexing_config(config: IndexingConfig) {
     INDEXING_CONFIG.with(|f| *f.borrow_mut() = config);
 }
 
-#[query]
-fn get_timer_id() -> String {
-    format!("{:?}", TIMER_ID.with(|f| f.borrow().clone()))
-}
-
-fn set_timer_id(timer_id: TimerId) {
-    TIMER_ID.with(|f| *f.borrow_mut() = timer_id);
-}
-
 #[update]
 pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, args: Vec<u8>) {
     if ic_cdk::caller() != _target() {
@@ -225,13 +215,12 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, 
     });
     set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
     ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
-        let timer_id = ic_cdk_timers::set_timer_interval(
+        ic_cdk_timers::set_timer_interval(
             std::time::Duration::from_secs(task_interval_secs as u64),
             || {
                 ic_cdk::spawn(async move { index().await });
             },
         );
-        set_timer_id(timer_id);
     });
 }
 

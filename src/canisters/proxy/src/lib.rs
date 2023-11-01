@@ -213,7 +213,6 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, 
         method,
         args,
     });
-    set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
     ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
         ic_cdk_timers::set_timer_interval(
             std::time::Duration::from_secs(task_interval_secs as u64),
@@ -222,6 +221,7 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, 
             },
         );
     });
+    set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
 }
 
 async fn index() {

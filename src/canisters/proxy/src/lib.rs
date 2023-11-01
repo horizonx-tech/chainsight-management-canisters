@@ -210,6 +210,9 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, 
     if ic_cdk::caller() != _target() {
         panic!("Not permitted")
     }
+    if next_schedule() != 0 {
+        panic!("Already started")
+    }
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
     let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
     let delay =

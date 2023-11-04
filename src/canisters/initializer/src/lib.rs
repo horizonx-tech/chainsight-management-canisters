@@ -139,7 +139,11 @@ async fn after_install(canister_id: &Principal) -> CallResult<()> {
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id,
         settings: CanisterSettings {
-            controllers: Some(vec![ic_cdk::api::id()]),
+            controllers: Some(vec![
+                ic_cdk::api::id(),
+                // for Development
+                ic_cdk::api::caller(),
+            ]),
             compute_allocation: Some(Nat::from(0)),
             freezing_threshold: Some(Nat::from(2592000)),
             memory_allocation: Some(Nat::from(0)),

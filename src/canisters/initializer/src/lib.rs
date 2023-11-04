@@ -45,10 +45,21 @@ fn registry() -> Principal {
     REGISTRY.with(|r| r.borrow().clone())
 }
 
+#[derive(CandidType, serde::Deserialize, Clone, Copy)]
+struct InitialeDeposits {
+    vault: u128,
+    db: u128,
+    proxy: u128,
+}
+
 #[update]
-async fn initialize() -> InitializeOutput {
+async fn initialize(deposits: InitialeDeposits) -> InitializeOutput {
+    let deposits_total = deposits.vault + deposits.db + deposits.proxy;
+    if deposits_total > ic_cdk::api::call::msg_cycles_accept128(deposits_total) {
+        panic!("Acceptable cycles are less than the specified.")
+    }
     let principal = ic_cdk::caller();
-    let vault = create_new_canister(300_000_000_000).await.unwrap();
+    let vault = create_new_canister(deposits.vault).await.unwrap();
     install_vault(&vault, &principal).await.unwrap();
     after_install(&vault).await.unwrap();
     register(principal, vault).await;
@@ -57,7 +68,7 @@ async fn initialize() -> InitializeOutput {
         principal.to_string(),
         vault.to_string()
     );
-    let db = create_new_canister(3_000_000_000_000).await.unwrap();
+    let db = create_new_canister(deposits.db).await.unwrap();
     install_db(db).await.unwrap();
     after_install(&db).await.unwrap();
     ic_cdk::println!(
@@ -66,7 +77,7 @@ async fn initialize() -> InitializeOutput {
         db.to_string()
     );
     init_db(db).await.unwrap();
-    let proxy = create_new_canister(300_000_000_000).await.unwrap();
+    let proxy = create_new_canister(deposits.proxy).await.unwrap();
     install_proxy(proxy, principal, db).await.unwrap();
     after_install(&proxy).await.unwrap();
     ic_cdk::println!(
@@ -128,7 +139,11 @@ async fn after_install(canister_id: &Principal) -> CallResult<()> {
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id,
         settings: CanisterSettings {
-            controllers: Some(vec![ic_cdk::api::id()]),
+            controllers: Some(vec![
+                ic_cdk::api::id(),
+                // for Development
+                ic_cdk::api::caller(),
+            ]),
             compute_allocation: Some(Nat::from(0)),
             freezing_threshold: Some(Nat::from(2592000)),
             memory_allocation: Some(Nat::from(0)),

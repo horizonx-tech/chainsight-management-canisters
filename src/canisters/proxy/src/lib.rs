@@ -1,11 +1,10 @@
-use std::{cell::RefCell, default};
+use std::cell::RefCell;
 
-use candid::{CandidType, Int, Principal};
+use candid::{candid_method, CandidType, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
     query, update,
 };
-use ic_cdk_timers::TimerId;
 use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -54,11 +53,22 @@ thread_local! {
 
 #[query]
 #[candid_method(query)]
+fn target() -> Principal {
+    _target()
+}
+
+fn _target() -> Principal {
+    TARGET.with(|target| target.borrow().clone())
+}
+
+#[query]
+#[candid_method(query)]
 fn db() -> Principal {
     _db()
 }
-fn _registry() -> Principal {
-    REGISTRY.with(|registry| registry.borrow().clone())
+
+fn _db() -> Principal {
+    DB.with(|db| db.borrow().clone())
 }
 
 #[query]
@@ -66,18 +76,11 @@ fn _registry() -> Principal {
 fn registry() -> Principal {
     _registry()
 }
-fn _target() -> Principal {
-    TARGET.with(|target| target.borrow().clone())
+
+fn _registry() -> Principal {
+    REGISTRY.with(|registry| registry.borrow().clone())
 }
 
-#[query]
-#[candid_method(query)]
-fn target() -> Principal {
-    _target()
-}
-fn _db() -> Principal {
-    DB.with(|db| db.borrow().clone())
-}
 
 #[ic_cdk::init]
 fn init(registry: Principal, target: Principal, db: Principal) {
@@ -106,6 +109,15 @@ async fn list_logs(from: Int, to: Int) -> Vec<CallLog> {
     }
 }
 
+#[update]
+#[candid_method(update)]
+async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
+    let caller = ic_cdk::caller();
+    let result = _proxy_call(caller, method, args).await;
+    _put_call_log(caller).await;
+    result
+}
+
 async fn _proxy_call(caller: Principal, method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
     if !canister_exists(caller).await {
         ic_cdk::println!("Unknown canster: {:?}", caller.to_string());
@@ -120,15 +132,6 @@ async fn _proxy_call(caller: Principal, method: String, args: Vec<u8>) -> CallRe
     if result.is_err() {
         ic_cdk::println!("Error: {:?}", result);
     }
-    result
-}
-
-#[update]
-#[candid_method(update)]
-async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
-    let caller = ic_cdk::caller();
-    let result = _proxy_call(caller, method, args).await;
-    _put_call_log(caller).await;
     result
 }
 

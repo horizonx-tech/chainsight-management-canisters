@@ -53,6 +53,7 @@ thread_local! {
 }
 
 #[query]
+#[candid_method(query)]
 fn db() -> Principal {
     _db()
 }
@@ -61,6 +62,7 @@ fn _registry() -> Principal {
 }
 
 #[query]
+#[candid_method(query)]
 fn registry() -> Principal {
     _registry()
 }
@@ -69,6 +71,7 @@ fn _target() -> Principal {
 }
 
 #[query]
+#[candid_method(query)]
 fn target() -> Principal {
     _target()
 }
@@ -90,6 +93,7 @@ fn init(registry: Principal, target: Principal, db: Principal) {
 }
 
 #[update]
+#[candid_method(update)]
 async fn list_logs(from: Int, to: Int) -> Vec<CallLog> {
     let call_result: CallResult<(Vec<CallLog>,)> =
         ic_cdk::api::call::call(_registry(), "listLogsOf", (_target(), from, to)).await;
@@ -120,6 +124,7 @@ async fn _proxy_call(caller: Principal, method: String, args: Vec<u8>) -> CallRe
 }
 
 #[update]
+#[candid_method(update)]
 async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
     let caller = ic_cdk::caller();
     let result = _proxy_call(caller, method, args).await;
@@ -161,6 +166,7 @@ async fn _put_call_log(caller: Principal) {
 }
 
 #[update]
+#[candid_method(update)]
 fn set_registry(id: Principal) {
     REGISTRY.with(|registry| {
         *registry.borrow_mut() = id;
@@ -168,16 +174,19 @@ fn set_registry(id: Principal) {
 }
 
 #[query]
+#[candid_method(query)]
 fn last_succeeded() -> u64 {
     LAST_SUCCEEDED.with(|x| *x.borrow())
 }
 
 #[query]
+#[candid_method(query)]
 fn last_execution_result() -> ExecutionResult {
     LAST_EXECUTION_RESULT.with(|x| x.borrow().clone())
 }
 
 #[query]
+#[candid_method(query)]
 fn next_schedule() -> u64 {
     NEXT_SCHEDULE.with(|f| *f.borrow())
 }
@@ -187,6 +196,7 @@ fn set_next_schedule(time: u64) {
 }
 
 #[query]
+#[candid_method(query)]
 fn get_indexing_config() -> IndexingConfig {
     INDEXING_CONFIG.with(|f| f.borrow().clone())
 }
@@ -196,6 +206,7 @@ fn set_indexing_config(config: IndexingConfig) {
 }
 
 #[update]
+#[candid_method(update)]
 pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, args: Vec<u8>) {
     if ic_cdk::caller() != _target() {
         panic!("Not permitted")

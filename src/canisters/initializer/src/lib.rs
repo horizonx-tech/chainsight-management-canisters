@@ -1,9 +1,9 @@
-use std::cell::RefCell;
+use std::{cell::RefCell, result};
 
 use candid::{encode_args, encode_one, CandidType, Nat, Principal};
 use ic_cdk::{
     api::{
-        call::CallResult,
+        call::{self, CallResult},
         management_canister::{
             main::{
                 create_canister, deposit_cycles, install_code, update_settings,
@@ -46,21 +46,45 @@ fn registry() -> Principal {
 }
 
 #[derive(CandidType, serde::Deserialize, Clone, Copy)]
-struct InitialeDeposits {
-    vault: u128,
-    db: u128,
-    proxy: u128,
+struct CycleManagement {
+    initial_value: u128,
+    refueling_value: u128,
+    refueling_threashold: u128,
+}
+
+#[derive(CandidType, serde::Deserialize, Clone, Copy)]
+struct CycleManagements {
+    refueling_interval: u64,
+    vault_intial_supply: u128,
+    indexer: CycleManagement,
+    db: CycleManagement,
+    proxy: CycleManagement,
 }
 
 #[update]
-async fn initialize(deposits: InitialeDeposits) -> InitializeOutput {
-    let deposits_total = deposits.vault + deposits.db + deposits.proxy;
+async fn initialize(deployer: Principal, cycles: CycleManagements) -> InitializeOutput {
+    let deposits_total = cycles.vault_intial_supply
+        + cycles.indexer.initial_value
+        + cycles.db.initial_value
+        + cycles.proxy.initial_value;
     if deposits_total > ic_cdk::api::call::msg_cycles_accept128(deposits_total) {
-        panic!("Acceptable cycles are less than the specified.")
+        panic!("Acceptable cycles are less than the specified in parameters.")
     }
+
     let principal = ic_cdk::caller();
-    let vault = create_new_canister(deposits.vault).await.unwrap();
-    install_vault(&vault, &principal).await.unwrap();
+
+    let vault = create_new_canister(cycles.vault_intial_supply)
+        .await
+        .unwrap();
+    install_vault(
+        &vault,
+        &principal,
+        &deployer,
+        deposits_total,
+        cycles.refueling_interval,
+    )
+    .await
+    .unwrap();
     after_install(&vault).await.unwrap();
     register(principal, vault).await;
     ic_cdk::println!(
@@ -68,7 +92,8 @@ async fn initialize(deposits: InitialeDeposits) -> InitializeOutput {
         principal.to_string(),
         vault.to_string()
     );
-    let db = create_new_canister(deposits.db).await.unwrap();
+
+    let db = create_new_canister(cycles.db.initial_value).await.unwrap();
     install_db(db).await.unwrap();
     after_install(&db).await.unwrap();
     ic_cdk::println!(
@@ -77,7 +102,10 @@ async fn initialize(deposits: InitialeDeposits) -> InitializeOutput {
         db.to_string()
     );
     init_db(db).await.unwrap();
-    let proxy = create_new_canister(deposits.proxy).await.unwrap();
+
+    let proxy = create_new_canister(cycles.proxy.initial_value)
+        .await
+        .unwrap();
     install_proxy(proxy, principal, db).await.unwrap();
     after_install(&proxy).await.unwrap();
     ic_cdk::println!(
@@ -85,6 +113,9 @@ async fn initialize(deposits: InitialeDeposits) -> InitializeOutput {
         principal.to_string(),
         proxy.to_string()
     );
+
+    set_refuel_targets(cycles, vault, principal, db, proxy).await;
+
     InitializeOutput { proxy, db }
 }
 
@@ -93,12 +124,18 @@ fn get_registry() -> Principal {
     registry()
 }
 
-async fn install_vault(created: &Principal, canister: &Principal) -> CallResult<()> {
+async fn install_vault(
+    created: &Principal,
+    canister: &Principal,
+    deployer: &Principal,
+    initial_supply: u128,
+    refueling_interval: u64,
+) -> CallResult<()> {
     let canister_id = created.clone();
     _install(
         canister_id,
         VAULT_WASM.to_vec(),
-        encode_one(canister.as_slice().to_vec()).unwrap(),
+        encode_args((canister, deployer, initial_supply, refueling_interval)).unwrap(),
     )
     .await
 }
@@ -172,4 +209,46 @@ async fn register(principal: Principal, vault: Principal) {
     let reg = registry();
     let _: CallResult<()> =
         ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
+}
+
+async fn set_refuel_targets(
+    cycles: CycleManagements,
+    vault: Principal,
+    indexer: Principal,
+    db: Principal,
+    proxy: Principal,
+) {
+    let res: CallResult<()> = ic_cdk::api::call::call(
+        vault,
+        "put_refuel_target",
+        (
+            indexer,
+            cycles.indexer.refueling_value,
+            cycles.indexer.refueling_threashold,
+        ),
+    )
+    .await;
+    res.unwrap();
+    let res: CallResult<()> = ic_cdk::api::call::call(
+        vault,
+        "put_refuel_target",
+        (
+            db,
+            cycles.db.refueling_value,
+            cycles.db.refueling_threashold,
+        ),
+    )
+    .await;
+    res.unwrap();
+    let res: CallResult<()> = ic_cdk::api::call::call(
+        vault,
+        "put_refuel_target",
+        (
+            proxy,
+            cycles.proxy.refueling_value,
+            cycles.proxy.refueling_threashold,
+        ),
+    )
+    .await;
+    res.unwrap();
 }

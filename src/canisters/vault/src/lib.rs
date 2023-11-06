@@ -97,6 +97,7 @@ fn balance_of(principal: Principal) -> Balance {
 #[query]
 #[candid_method(query)]
 fn withdrawable_of(principal: Principal) -> Balance {
+    salvage_stray_cycles();
     SHARE_MAP.with(|m| {
         let share = m.borrow().get(&principal.into()).unwrap_or_default();
         share.to_balance(&index(), &Balance::from(canister_balance128()))
@@ -154,6 +155,15 @@ fn add_share(principal: Principal, delta: &Balance, neg: bool) {
         };
         m.borrow_mut().insert(principal.into(), after);
     })
+}
+
+fn salvage_stray_cycles() {
+    let actual_balance: Balance = canister_balance128().into();
+    if actual_balance > total_supply() {
+        TOTAL_SUPPLY.with(|m| {
+            m.borrow_mut().set(actual_balance).unwrap();
+        })
+    }
 }
 
 #[update]

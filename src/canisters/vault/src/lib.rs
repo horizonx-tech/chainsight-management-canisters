@@ -14,7 +14,7 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     Cell, DefaultMemoryImpl, StableBTreeMap,
 };
-use std::{cell::RefCell, str::FromStr};
+use std::{cell::RefCell, str::FromStr, time::Duration};
 use types::types::{Balance, Index, RefuelTarget};
 mod types;
 use crate::types::types::Depositor;
@@ -38,8 +38,15 @@ thread_local! {
 }
 
 #[ic_cdk::init]
-fn init(param: Vec<u8>) {
-    set_chainsight_canister_id(Principal::from_slice(param.as_slice()))
+fn init(
+    chainsight_caniseter: Principal,
+    deployer: Principal,
+    initial_supply: Balance,
+    refueling_interval_secs: u64,
+) {
+    set_chainsight_canister_id(chainsight_caniseter);
+    increase_index(&initial_supply, deployer);
+    start_refueling(refueling_interval_secs);
 }
 
 #[update]
@@ -256,6 +263,12 @@ fn set_chainsight_canister_id(principal: Principal) {
     CHAINSIGHT_CANISTER_ID.with(|m| {
         m.borrow_mut().set(principal.to_string()).unwrap();
     })
+}
+
+fn start_refueling(interval_secs: u64) {
+    ic_cdk_timers::set_timer_interval(Duration::from_secs(interval_secs), || {
+        ic_cdk::spawn(refuel())
+    });
 }
 
 #[cfg(test)]

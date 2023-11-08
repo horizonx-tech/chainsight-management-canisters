@@ -84,7 +84,7 @@ impl From<Principal> for Depositor {
 pub struct RefuelTarget {
     pub id: Principal,
     pub value: u128,
-    pub threashold: u128,
+    pub threshold: u128,
 }
 
 impl Storable for Balance {
@@ -202,7 +202,7 @@ mod tests {
     fn test_refuel_setting_storable() {
         let setting = RefuelTarget {
             id: Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap(),
-            threashold: 100,
+            threshold: 100,
             value: 200,
         };
         assert_eq!(setting, RefuelTarget::from_bytes(setting.to_bytes()));

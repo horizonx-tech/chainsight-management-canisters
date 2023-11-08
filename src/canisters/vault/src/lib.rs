@@ -79,11 +79,7 @@ async fn withdraw(delta: Balance) {
 #[query]
 #[candid_method(query)]
 fn total_supply() -> Balance {
-    TOTAL_SUPPLY.with(
-        |m: &RefCell<Cell<Balance, VirtualMemory<std::rc::Rc<RefCell<Vec<u8>>>>>>| {
-            m.borrow().get().clone()
-        },
-    )
+    TOTAL_SUPPLY.with(|m| m.borrow().get().clone())
 }
 
 #[query]
@@ -218,7 +214,7 @@ async fn put_refuel_target(target: RefuelTarget) {
     .await
     .unwrap()
     .0;
-    if !res.settings.controllers.contains(&target.id) {
+    if !res.settings.controllers.contains(&caller()) {
         panic!("Not permitted")
     }
     _put_refuel_target(target);
@@ -329,7 +325,7 @@ mod tests {
     fn test_put_refuel_target() {
         let mut target1 = RefuelTarget {
             id: Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap(),
-            threashold: 100,
+            threshold: 100,
             value: 200,
         };
         _put_refuel_target(target1);
@@ -338,7 +334,7 @@ mod tests {
 
         let target2 = RefuelTarget {
             id: Principal::from_text("vsrdt-ryaaa-aaaao-a2muq-cai").unwrap(),
-            threashold: 1000,
+            threshold: 1000,
             value: 2000,
         };
         _put_refuel_target(target2);

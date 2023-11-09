@@ -17,6 +17,7 @@ use std::cell::RefCell;
 
 #[derive(CandidType, serde::Deserialize, Clone, Copy)]
 pub struct InitializeOutput {
+    pub vault: Principal,
     pub proxy: Principal,
     pub db: Principal,
 }
@@ -118,7 +119,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         vault.to_string()
     );
 
-    InitializeOutput { proxy, db }
+    InitializeOutput { vault, proxy, db }
 }
 
 #[query]

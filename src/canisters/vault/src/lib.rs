@@ -190,6 +190,7 @@ fn receive_revenue() {
 #[update]
 #[candid_method(update)]
 async fn refuel() {
+    ic_cdk::println!("Start refueling...");
     for target in get_refuel_targets() {
         let res = canister_status(CanisterIdRecord {
             canister_id: target.id,
@@ -197,7 +198,17 @@ async fn refuel() {
         .await;
         if let Ok(status) = res {
             let balance = status.0.cycles;
-            if balance > target.threashold {
+            ic_cdk::println!(
+                "[{}] balance: {}",
+                target.id.to_string(),
+                balance.to_string(),
+            );
+            if balance > target.threshold {
+                ic_cdk::println!(
+                    "[{}] skip refueling: threshold={}",
+                    target.id.to_string(),
+                    target.threshold.to_string(),
+                );
                 continue;
             }
         }
@@ -210,6 +221,11 @@ async fn refuel() {
         )
         .await
         .unwrap();
+        ic_cdk::println!(
+            "[{}] refueled: {} ",
+            target.id.to_string(),
+            target.value.to_string(),
+        );
     }
 }
 

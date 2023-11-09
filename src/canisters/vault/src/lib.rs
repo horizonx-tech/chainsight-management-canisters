@@ -43,10 +43,18 @@ fn init(
     deployer: Principal,
     initial_supply: Balance,
     refueling_interval_secs: u64,
+    refuel_targets: Vec<(Principal, u128, u128)>,
 ) {
     set_chainsight_canister_id(chainsight_caniseter);
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
+    refuel_targets.iter().for_each(|(id, value, threshold)| {
+        _put_refuel_target(RefuelTarget {
+            id: id.clone(),
+            value: value.clone(),
+            threshold: threshold.clone(),
+        });
+    });
 }
 
 #[update]
@@ -207,7 +215,7 @@ async fn refuel() {
 
 #[update]
 #[candid_method(update)]
-async fn put_refuel_target(target: RefuelTarget) {
+async fn put_refuel_target(id: Principal, value: u128, threshold: u128) {
     let res = canister_status(CanisterIdRecord {
         canister_id: ic_cdk::id(),
     })
@@ -217,7 +225,11 @@ async fn put_refuel_target(target: RefuelTarget) {
     if !res.settings.controllers.contains(&caller()) {
         panic!("Not permitted")
     }
-    _put_refuel_target(target);
+    _put_refuel_target(RefuelTarget {
+        id,
+        value,
+        threshold,
+    });
 }
 
 fn _put_refuel_target(target: RefuelTarget) {

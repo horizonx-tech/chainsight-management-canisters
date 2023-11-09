@@ -61,13 +61,26 @@ struct CycleManagements {
     proxy: CycleManagement,
 }
 
+impl CycleManagements {
+    fn initial_supply(&self) -> u128 {
+        self.vault_intial_supply
+            + self.indexer.initial_supply
+            + self.db.initial_supply
+            + self.proxy.initial_supply
+    }
+}
+
+#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RefuelTarget {
+    pub id: Principal,
+    pub amount: u128,
+    pub threshold: u128,
+}
+
 #[update]
 #[candid_method(update)]
 async fn initialize(deployer: Principal, cycles: CycleManagements) -> InitializeOutput {
-    let deposits_total = cycles.vault_intial_supply
-        + cycles.indexer.initial_supply
-        + cycles.db.initial_supply
-        + cycles.proxy.initial_supply;
+    let deposits_total = cycles.initial_supply();
     if deposits_total > ic_cdk::api::call::msg_cycles_accept128(deposits_total) {
         panic!("Acceptable cycles are less than the specified in parameters.")
     }
@@ -146,17 +159,21 @@ async fn install_vault(
             initial_supply,
             cycles.refueling_interval,
             vec![
-                (
-                    indexer,
-                    cycles.indexer.refueling_amount,
-                    cycles.indexer.refueling_threshold,
-                ),
-                (db, cycles.db.refueling_amount, cycles.db.refueling_threshold),
-                (
-                    proxy,
-                    cycles.proxy.refueling_amount,
-                    cycles.proxy.refueling_threshold,
-                ),
+                RefuelTarget {
+                    id: indexer.clone(),
+                    amount: cycles.indexer.refueling_amount,
+                    threshold: cycles.indexer.refueling_threshold,
+                },
+                RefuelTarget {
+                    id: db.clone(),
+                    amount: cycles.db.refueling_amount,
+                    threshold: cycles.db.refueling_threshold,
+                },
+                RefuelTarget {
+                    id: proxy.clone(),
+                    amount: cycles.proxy.refueling_amount,
+                    threshold: cycles.proxy.refueling_threshold,
+                },
             ],
         ))
         .unwrap(),

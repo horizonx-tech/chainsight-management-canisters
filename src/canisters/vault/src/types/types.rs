@@ -80,7 +80,7 @@ impl From<Principal> for Depositor {
     }
 }
 
-#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+#[derive(CandidType, Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RefuelTarget {
     pub id: Principal,
     pub amount: u128,

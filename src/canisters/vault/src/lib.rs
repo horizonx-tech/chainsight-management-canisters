@@ -43,18 +43,12 @@ fn init(
     deployer: Principal,
     initial_supply: Balance,
     refueling_interval_secs: u64,
-    refuel_targets: Vec<(Principal, u128, u128)>,
+    refuel_targets: Vec<RefuelTarget>,
 ) {
     set_chainsight_canister_id(chainsight_caniseter);
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
-    refuel_targets.iter().for_each(|(id, value, threshold)| {
-        _put_refuel_target(RefuelTarget {
-            id: id.clone(),
-            amount: value.clone(),
-            threshold: threshold.clone(),
-        });
-    });
+    refuel_targets.iter().for_each(_put_refuel_target);
 }
 
 #[update]
@@ -231,7 +225,7 @@ async fn refuel() {
 
 #[update]
 #[candid_method(update)]
-async fn put_refuel_target(id: Principal, amount: u128, threshold: u128) {
+async fn put_refuel_target(target: RefuelTarget) {
     let res = canister_status(CanisterIdRecord {
         canister_id: ic_cdk::id(),
     })
@@ -241,14 +235,10 @@ async fn put_refuel_target(id: Principal, amount: u128, threshold: u128) {
     if !res.settings.controllers.contains(&caller()) {
         panic!("Not permitted")
     }
-    _put_refuel_target(RefuelTarget {
-        id,
-        amount,
-        threshold,
-    });
+    _put_refuel_target(&target);
 }
 
-fn _put_refuel_target(target: RefuelTarget) {
+fn _put_refuel_target(target: &RefuelTarget) {
     let position = REFUEL_TARGETS.with(|m| m.borrow().iter().position(|s| s.id == target.id));
     if let Some(i) = position {
         REFUEL_TARGETS.with(|m| {
@@ -356,7 +346,7 @@ mod tests {
             threshold: 100,
             amount: 200,
         };
-        _put_refuel_target(target1);
+        _put_refuel_target(&target1);
         assert_eq!(get_refuel_targets()[0], target1);
         assert_eq!(get_refuel_targets().len(), 1);
 
@@ -365,12 +355,12 @@ mod tests {
             threshold: 1000,
             amount: 2000,
         };
-        _put_refuel_target(target2);
+        _put_refuel_target(&target2);
         assert_eq!(get_refuel_targets()[1], target2);
         assert_eq!(get_refuel_targets().len(), 2);
 
         target1.amount = 300;
-        _put_refuel_target(target1);
+        _put_refuel_target(&target1);
         assert_eq!(get_refuel_targets()[0].amount, 300);
         assert_eq!(get_refuel_targets().len(), 2);
     }

@@ -83,7 +83,7 @@ impl From<Principal> for Depositor {
 #[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
 pub struct RefuelTarget {
     pub id: Principal,
-    pub value: u128,
+    pub amount: u128,
     pub threshold: u128,
 }
 
@@ -203,7 +203,7 @@ mod tests {
         let setting = RefuelTarget {
             id: Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap(),
             threshold: 100,
-            value: 200,
+            amount: 200,
         };
         assert_eq!(setting, RefuelTarget::from_bytes(setting.to_bytes()));
     }

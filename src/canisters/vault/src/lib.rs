@@ -51,7 +51,7 @@ fn init(
     refuel_targets.iter().for_each(|(id, value, threshold)| {
         _put_refuel_target(RefuelTarget {
             id: id.clone(),
-            value: value.clone(),
+            amount: value.clone(),
             threshold: threshold.clone(),
         });
     });
@@ -217,21 +217,21 @@ async fn refuel() {
             CanisterIdRecord {
                 canister_id: target.id,
             },
-            target.value,
+            target.amount,
         )
         .await
         .unwrap();
         ic_cdk::println!(
             "[{}] refueled: {} ",
             target.id.to_string(),
-            target.value.to_string(),
+            target.amount.to_string(),
         );
     }
 }
 
 #[update]
 #[candid_method(update)]
-async fn put_refuel_target(id: Principal, value: u128, threshold: u128) {
+async fn put_refuel_target(id: Principal, amount: u128, threshold: u128) {
     let res = canister_status(CanisterIdRecord {
         canister_id: ic_cdk::id(),
     })
@@ -243,7 +243,7 @@ async fn put_refuel_target(id: Principal, value: u128, threshold: u128) {
     }
     _put_refuel_target(RefuelTarget {
         id,
-        value,
+        amount,
         threshold,
     });
 }
@@ -354,7 +354,7 @@ mod tests {
         let mut target1 = RefuelTarget {
             id: Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap(),
             threshold: 100,
-            value: 200,
+            amount: 200,
         };
         _put_refuel_target(target1);
         assert_eq!(get_refuel_targets()[0], target1);
@@ -363,15 +363,15 @@ mod tests {
         let target2 = RefuelTarget {
             id: Principal::from_text("vsrdt-ryaaa-aaaao-a2muq-cai").unwrap(),
             threshold: 1000,
-            value: 2000,
+            amount: 2000,
         };
         _put_refuel_target(target2);
         assert_eq!(get_refuel_targets()[1], target2);
         assert_eq!(get_refuel_targets().len(), 2);
 
-        target1.value = 300;
+        target1.amount = 300;
         _put_refuel_target(target1);
-        assert_eq!(get_refuel_targets()[0].value, 300);
+        assert_eq!(get_refuel_targets()[0].amount, 300);
         assert_eq!(get_refuel_targets().len(), 2);
     }
 }

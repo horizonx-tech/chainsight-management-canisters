@@ -47,8 +47,8 @@ fn registry() -> Principal {
 
 #[derive(CandidType, serde::Deserialize, Clone, Copy)]
 struct CycleManagement {
-    initial_value: u128,
-    refueling_value: u128,
+    initial_supply: u128,
+    refueling_amount: u128,
     refueling_threshold: u128,
 }
 
@@ -65,9 +65,9 @@ struct CycleManagements {
 #[candid_method(update)]
 async fn initialize(deployer: Principal, cycles: CycleManagements) -> InitializeOutput {
     let deposits_total = cycles.vault_intial_supply
-        + cycles.indexer.initial_value
-        + cycles.db.initial_value
-        + cycles.proxy.initial_value;
+        + cycles.indexer.initial_supply
+        + cycles.db.initial_supply
+        + cycles.proxy.initial_supply;
     if deposits_total > ic_cdk::api::call::msg_cycles_accept128(deposits_total) {
         panic!("Acceptable cycles are less than the specified in parameters.")
     }
@@ -79,7 +79,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
 
-    let db = create_new_canister(cycles.db.initial_value).await.unwrap();
+    let db = create_new_canister(cycles.db.initial_supply).await.unwrap();
     install_db(db).await.unwrap();
     after_install(&db, controllers).await.unwrap();
     ic_cdk::println!(
@@ -89,7 +89,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     );
     init_db(db).await.unwrap();
 
-    let proxy = create_new_canister(cycles.proxy.initial_value)
+    let proxy = create_new_canister(cycles.proxy.initial_supply)
         .await
         .unwrap();
     install_proxy(proxy, principal, db).await.unwrap();
@@ -148,13 +148,13 @@ async fn install_vault(
             vec![
                 (
                     indexer,
-                    cycles.indexer.refueling_value,
+                    cycles.indexer.refueling_amount,
                     cycles.indexer.refueling_threshold,
                 ),
-                (db, cycles.db.refueling_value, cycles.db.refueling_threshold),
+                (db, cycles.db.refueling_amount, cycles.db.refueling_threshold),
                 (
                     proxy,
-                    cycles.proxy.refueling_value,
+                    cycles.proxy.refueling_amount,
                     cycles.proxy.refueling_threshold,
                 ),
             ],

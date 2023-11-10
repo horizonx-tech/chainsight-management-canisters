@@ -3,7 +3,7 @@ use std::{
     ops::{Add, Div, Mul, Sub},
 };
 
-use candid::{CandidType, Decode, Encode, Principal};
+use candid::{CandidType, Decode, Encode, Nat, Principal};
 use ic_stable_structures::{BoundedStorable, Storable};
 use serde::Deserialize;
 
@@ -85,6 +85,12 @@ pub struct RefuelTarget {
     pub id: Principal,
     pub amount: u128,
     pub threshold: u128,
+}
+
+#[derive(CandidType, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct CycleBalance {
+    pub id: Principal,
+    pub amount: Nat,
 }
 
 impl Storable for Balance {

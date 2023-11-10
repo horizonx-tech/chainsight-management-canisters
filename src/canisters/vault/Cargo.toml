@@ -16,3 +16,4 @@ ic-stable-structures = "0.5.4"
 rpc = { path = "../rpc" }
 common = { path = "../common" }
 serde = "1.0.164"
+futures = "0.3.29"

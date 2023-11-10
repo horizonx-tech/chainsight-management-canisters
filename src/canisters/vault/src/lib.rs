@@ -15,7 +15,7 @@ use ic_stable_structures::{
     Cell, DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, str::FromStr, time::Duration};
-use types::types::{Balance, Index, RefuelTarget};
+use types::types::{Balance, CycleBalance, Index, RefuelTarget};
 mod types;
 use crate::types::types::Depositor;
 
@@ -255,6 +255,35 @@ fn _put_refuel_target(target: &RefuelTarget) {
 #[candid_method(query)]
 fn get_refuel_targets() -> Vec<RefuelTarget> {
     REFUEL_TARGETS.with(|m| m.borrow().iter().map(|s| s.clone()).collect::<Vec<_>>())
+}
+
+#[update]
+#[candid_method(update)]
+async fn get_cycle_balances() -> Vec<CycleBalance> {
+    let mut balances: Vec<CycleBalance> = vec![];
+    let targets = get_refuel_targets();
+    let res = futures::future::join_all(targets.iter().map(|t| async {
+        let status = canister_status(CanisterIdRecord { canister_id: t.id })
+            .await
+            .unwrap();
+        CycleBalance {
+            id: t.id,
+            amount: status.0.cycles,
+        }
+    }));
+
+    let id = ic_cdk::id();
+    let status = canister_status(CanisterIdRecord { canister_id: id })
+        .await
+        .unwrap();
+    balances.push(CycleBalance {
+        id,
+        amount: status.0.cycles,
+    });
+  
+    res.await.into_iter().for_each(|b| balances.push(b));
+ 
+    balances
 }
 
 #[query]

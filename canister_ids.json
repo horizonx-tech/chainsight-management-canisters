@@ -1,14 +1,14 @@
 {
   "_management_canister_initializer": {
-    "ic": "vvqfh-4aaaa-aaaao-a2mua-cai"
+    "ic": "yhoh2-qaaaa-aaaao-a2n4a-cai"
   },
   "_management_canister_proxy": {
-    "ic": "vsrdt-ryaaa-aaaao-a2muq-cai"
+    "ic": "yapbo-5yaaa-aaaao-a2n4q-cai"
   },
   "_management_canister_registry": {
-    "ic": "v3sip-hqaaa-aaaao-a2mva-cai"
+    "ic": "yjmks-lqaaa-aaaao-a2n5a-cai"
   },
   "_management_canister_vault": {
-    "ic": "v4to3-kiaaa-aaaao-a2mvq-cai"
+    "ic": "yonmg-giaaa-aaaao-a2n5q-cai"
   }
 }

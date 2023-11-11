@@ -1,9 +1,23 @@
-type VaultCanister = service {
-    deposit : () -> ();
-    balance_of : (principal) -> (nat);
-    total_balance : () -> (nat);
-    consume : (nat) -> ();
-    supply : (nat) -> ();
-};
-
-service : () -> VaultCanister;
+type ComponentMetricsSnapshot = record { cycles : nat; timestamp : nat64 };
+type CycleBalance = record { id : principal; amount : nat };
+type RefuelTarget = record { id : principal; threshold : nat; amount : nat };
+service : {
+  balance_of : (principal) -> (nat) query;
+  get_cumulative_refueled : (principal) -> (nat) query;
+  get_cumulative_refueled_all : () -> (vec record { principal; nat }) query;
+  get_cycle_balances : () -> (vec CycleBalance);
+  get_refuel_targets : () -> (vec RefuelTarget) query;
+  index : () -> (nat) query;
+  metric : () -> (ComponentMetricsSnapshot) query;
+  metrics : (nat64) -> (vec ComponentMetricsSnapshot) query;
+  put_refuel_target : (RefuelTarget) -> ();
+  receive_revenue : () -> ();
+  refuel : () -> ();
+  set_canister : (principal) -> (bool);
+  share_of : (principal) -> (nat) query;
+  supply : (opt principal) -> ();
+  target_canister : () -> (principal) query;
+  total_supply : () -> (nat) query;
+  withdraw : (nat) -> ();
+  withdrawable_of : (principal) -> (nat) query;
+}

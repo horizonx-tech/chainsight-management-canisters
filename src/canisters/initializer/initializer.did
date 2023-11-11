@@ -1,12 +1,18 @@
-type Time = int;
+type CycleManagement = record {
+  refueling_amount : nat;
+  initial_supply : nat;
+  refueling_threshold : nat;
+};
+type CycleManagements = record {
+  db : CycleManagement;
+  vault_intial_supply : nat;
+  refueling_interval : nat64;
+  proxy : CycleManagement;
+  indexer : CycleManagement;
+};
 type InitializeOutput = record {
-    proxy : principal;
-    db : principal;
+  db : principal;
+  vault : principal;
+  proxy : principal;
 };
-type InitializerCanister = service {
-    initialize : () -> (InitializeOutput);
-    get_proxy : () -> (principal);
-    get_registry : () -> (principal);
-    set_registry : (principal) -> ();
-};
-service : () -> InitializerCanister;
+service : { initialize : (principal, CycleManagements) -> (InitializeOutput) }

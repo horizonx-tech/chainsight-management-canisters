@@ -354,7 +354,10 @@ async fn start_monitoring_component_metrics(interval_secs: u64) {
             ic_cdk::spawn(monitor_component_metrics());
         });
     });
-    monitor_component_metrics().await;
+
+    ic_cdk_timers::set_timer(std::time::Duration::from_secs(0), move || {
+        ic_cdk::spawn(monitor_component_metrics());
+    });
 }
 
 async fn monitor_component_metrics() {

@@ -92,6 +92,8 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
 
+    after_install(&principal, controllers).await.unwrap();
+
     let db = create_new_canister(cycles.db.initial_supply).await.unwrap();
     install_db(db).await.unwrap();
     after_install(&db, controllers).await.unwrap();

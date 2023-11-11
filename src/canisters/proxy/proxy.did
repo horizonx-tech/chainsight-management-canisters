@@ -1,18 +1,39 @@
-type Time = int;
-type ProxyCanister = service {
-    list_logs : (principal, Time, Time) -> (vec CallLog);
-    set_registry : (principal) -> ();
-    put_call_log : (principal) -> ();
-    register : (text, text) -> ();
-    proxy_call : (principal, principal, text, vec nat8) -> (vec nat8);
-    db : () -> (principal) query;
-    target : () -> (principal) query;
-    registry : () -> (principal) query;
-};
+type CallLog = record { at : int; interactTo : Canister; canister : Canister };
 type Canister = record { "principal" : principal };
-type CallLog = record {
-    at : Time;
-    canister : Canister;
-    interactTo : Canister;
+type Error = record { message : text };
+type ExecutionResult = record {
+  is_succeeded : bool;
+  error : opt Error;
+  timestamp : nat64;
 };
-service : () -> ProxyCanister;
+type IndexingConfig = record {
+  method : text;
+  args : vec nat8;
+  task_interval_secs : nat32;
+};
+type RejectionCode = variant {
+  NoError;
+  CanisterError;
+  SysTransient;
+  DestinationInvalid;
+  Unknown;
+  SysFatal;
+  CanisterReject;
+};
+type Result = variant {
+  Ok : record { vec nat8 };
+  Err : record { RejectionCode; text };
+};
+service : {
+  db : () -> (principal) query;
+  get_indexing_config : () -> (IndexingConfig) query;
+  last_execution_result : () -> (ExecutionResult) query;
+  last_succeeded : () -> (nat64) query;
+  list_logs : (int, int) -> (vec CallLog);
+  next_schedule : () -> (nat64) query;
+  proxy_call : (text, vec nat8) -> (Result);
+  registry : () -> (principal) query;
+  set_registry : (principal) -> ();
+  start_indexing : (nat32, nat32, text, vec nat8) -> ();
+  target : () -> (principal) query;
+}

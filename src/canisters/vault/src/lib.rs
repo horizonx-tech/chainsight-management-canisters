@@ -1,4 +1,4 @@
-use candid::{candid_method, Nat, Principal};
+use candid::{candid_method, Principal};
 use ic_cdk::{
     api::{
         call::msg_cycles_accept128,
@@ -21,6 +21,8 @@ use types::types::{
 mod types;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
+
+const MONITROING_INTERVAL_SECS: u64 = 3600;
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
@@ -57,10 +59,12 @@ async fn init(
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
     refuel_targets.iter().for_each(_put_refuel_target);
-    setup_monitoring_component_metrics().await;
-    refuel_targets_inital_supply.iter().for_each(|(id, amount)| {
-        record_cumulative_refueled(*id, *amount);
-    });
+    refuel_targets_inital_supply
+        .iter()
+        .for_each(|(id, amount)| {
+            record_cumulative_refueled(*id, *amount);
+        });
+    start_monitoring_component_metrics(MONITROING_INTERVAL_SECS).await;
 }
 
 #[update]
@@ -340,14 +344,13 @@ pub fn metrics(n: usize) -> Vec<ComponentMetricsSnapshot> {
         .with(|m| m.borrow().iter().rev().take(n).cloned().collect::<Vec<_>>())
 }
 
-async fn setup_monitoring_component_metrics() {
-    let unit = 3600;
-    let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
-    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
-    let delay = round_timestamp(current_time_sec, unit) + unit - current_time_sec;
+async fn start_monitoring_component_metrics(interval_secs: u64) {
+    let round_timestamp = |ts: u64, unit: u64| ts / unit * unit;
+    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u64;
+    let delay = round_timestamp(current_time_sec, interval_secs) + interval_secs - current_time_sec;
 
-    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
-        ic_cdk_timers::set_timer_interval(std::time::Duration::from_secs(unit as u64), || {
+    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay), move || {
+        ic_cdk_timers::set_timer_interval(std::time::Duration::from_secs(interval_secs), || {
             ic_cdk::spawn(monitor_component_metrics());
         });
     });
@@ -383,8 +386,12 @@ fn get_cumulative_refueled(target: Principal) -> u128 {
 #[query]
 #[candid_method(query)]
 fn get_cumulative_refueled_all() -> Vec<(Principal, u128)> {
-    CUMULATIVE_REFUELED
-        .with(|m| m.borrow().iter().map(|(k, v)| (k.0.clone(), v.clone())).collect())
+    CUMULATIVE_REFUELED.with(|m| {
+        m.borrow()
+            .iter()
+            .map(|(k, v)| (k.0.clone(), v.clone()))
+            .collect()
+    })
 }
 
 fn record_cumulative_refueled(target: Principal, amount: u128) {

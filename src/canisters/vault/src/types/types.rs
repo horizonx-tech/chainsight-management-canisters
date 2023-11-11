@@ -73,8 +73,8 @@ impl From<u128> for Index {
 }
 
 #[derive(CandidType, Deserialize, PartialEq, PartialOrd, Eq, Ord, Clone)]
-pub struct Depositor(Principal);
-impl From<Principal> for Depositor {
+pub struct PrincipalStorable(pub Principal);
+impl From<Principal> for PrincipalStorable {
     fn from(principal: Principal) -> Self {
         Self(principal)
     }
@@ -117,7 +117,7 @@ impl Storable for Index {
         Decode!(bytes.as_ref(), Self).unwrap()
     }
 }
-impl Storable for Depositor {
+impl Storable for PrincipalStorable {
     fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
         Cow::Owned(Encode!(self).unwrap())
     }
@@ -142,7 +142,7 @@ impl Storable for ComponentMetricsSnapshot {
         Cow::Owned(Encode!(self).unwrap())
     }
 }
-impl BoundedStorable for Depositor {
+impl BoundedStorable for PrincipalStorable {
     const MAX_SIZE: u32 = 100;
     const IS_FIXED_SIZE: bool = false;
 }

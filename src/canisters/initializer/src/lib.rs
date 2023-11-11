@@ -113,17 +113,9 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         proxy.to_string()
     );
 
-    install_vault(
-        &vault,
-        &principal,
-        &db,
-        &proxy,
-        &deployer,
-        deposits_total,
-        &cycles,
-    )
-    .await
-    .unwrap();
+    install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
+        .await
+        .unwrap();
     after_install(&vault, controllers).await.unwrap();
     register(principal, vault).await;
     ic_cdk::println!(
@@ -146,7 +138,6 @@ async fn install_vault(
     db: &Principal,
     proxy: &Principal,
     deployer: &Principal,
-    initial_supply: u128,
     cycles: &CycleManagements,
 ) -> CallResult<()> {
     let canister_id = created.clone();
@@ -156,7 +147,7 @@ async fn install_vault(
         encode_args((
             indexer,
             deployer,
-            initial_supply,
+            cycles.initial_supply(),
             cycles.refueling_interval,
             vec![
                 RefuelTarget {
@@ -174,6 +165,11 @@ async fn install_vault(
                     amount: cycles.proxy.refueling_amount,
                     threshold: cycles.proxy.refueling_threshold,
                 },
+            ],
+            vec![
+                (indexer.clone(), cycles.indexer.initial_supply),
+                (db.clone(), cycles.db.initial_supply),
+                (proxy.clone(), cycles.proxy.initial_supply),
             ],
         ))
         .unwrap(),

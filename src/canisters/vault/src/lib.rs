@@ -15,16 +15,17 @@ use ic_stable_structures::{
     Cell, DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, str::FromStr, time::Duration};
-use types::types::{Balance, ComponentMetricsSnapshot, CycleBalance, Index, RefuelTarget};
+use types::types::{
+    Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget,
+};
 mod types;
-use crate::types::types::Depositor;
 
 type Memory = VirtualMemory<DefaultMemoryImpl>;
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
-    static SHARE_MAP: RefCell<StableBTreeMap<Depositor, Index, Memory>> = RefCell::new(
+    static SHARE_MAP: RefCell<StableBTreeMap<PrincipalStorable, Index, Memory>> = RefCell::new(
         StableBTreeMap::init(
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
         )
@@ -34,6 +35,11 @@ thread_local! {
     static INDEX: RefCell<Cell<Index,Memory>> = RefCell::new(Cell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))), Index::default()).unwrap());
     static REFUEL_TARGETS: RefCell<ic_stable_structures::Vec<RefuelTarget,Memory>> = RefCell::new(
         ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
+    );
+    static CUMULATIVE_REFUELED: RefCell<StableBTreeMap<PrincipalStorable, u128, Memory>> = RefCell::new(
+        StableBTreeMap::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
+        )
     );
     static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<Vec<ComponentMetricsSnapshot>> = std::cell::RefCell::new(Vec::new());
 }
@@ -45,12 +51,16 @@ async fn init(
     initial_supply: Balance,
     refueling_interval_secs: u64,
     refuel_targets: Vec<RefuelTarget>,
+    refuel_targets_inital_supply: Vec<(Principal, u128)>,
 ) {
     set_chainsight_canister_id(chainsight_caniseter);
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
     refuel_targets.iter().for_each(_put_refuel_target);
     setup_monitoring_component_metrics().await;
+    refuel_targets_inital_supply.iter().for_each(|(id, amount)| {
+        record_cumulative_refueled(*id, *amount);
+    });
 }
 
 #[update]
@@ -217,6 +227,7 @@ async fn refuel() {
         )
         .await
         .unwrap();
+        record_cumulative_refueled(target.id, target.amount);
         ic_cdk::println!(
             "[{}] refueled: {} ",
             target.id.to_string(),
@@ -360,6 +371,27 @@ async fn monitor_component_metrics() {
 fn add_component_metrics_snapshot(datum: ComponentMetricsSnapshot) {
     COMPONENT_METRICS_SNAPSHOT.with(|m| {
         m.borrow_mut().push(datum);
+    })
+}
+
+#[query]
+#[candid_method(query)]
+fn get_cumulative_refueled(target: Principal) -> u128 {
+    CUMULATIVE_REFUELED.with(|m| m.borrow().get(&target.into()).unwrap_or_default().clone())
+}
+
+#[query]
+#[candid_method(query)]
+fn get_cumulative_refueled_all() -> Vec<(Principal, u128)> {
+    CUMULATIVE_REFUELED
+        .with(|m| m.borrow().iter().map(|(k, v)| (k.0.clone(), v.clone())).collect())
+}
+
+fn record_cumulative_refueled(target: Principal, amount: u128) {
+    CUMULATIVE_REFUELED.with(|m| {
+        let balance = m.borrow().get(&target.into()).unwrap_or_default();
+        let after = balance + amount;
+        m.borrow_mut().insert(target.into(), after);
     })
 }
 

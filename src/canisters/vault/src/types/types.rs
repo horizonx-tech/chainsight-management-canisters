@@ -88,6 +88,12 @@ pub struct RefuelTarget {
 }
 
 #[derive(CandidType, Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct ComponentMetricsSnapshot {
+    pub timestamp: u64,
+    pub cycles: u128,
+}
+
+#[derive(CandidType, Deserialize, Clone, PartialEq, Eq, Debug)]
 pub struct CycleBalance {
     pub id: Principal,
     pub amount: Nat,
@@ -128,6 +134,14 @@ impl Storable for RefuelTarget {
         Cow::Owned(Encode!(self).unwrap())
     }
 }
+impl Storable for ComponentMetricsSnapshot {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+}
 impl BoundedStorable for Depositor {
     const MAX_SIZE: u32 = 100;
     const IS_FIXED_SIZE: bool = false;
@@ -141,6 +155,10 @@ impl BoundedStorable for Index {
     const IS_FIXED_SIZE: bool = false;
 }
 impl BoundedStorable for RefuelTarget {
+    const MAX_SIZE: u32 = 100;
+    const IS_FIXED_SIZE: bool = false;
+}
+impl BoundedStorable for ComponentMetricsSnapshot {
     const MAX_SIZE: u32 = 100;
     const IS_FIXED_SIZE: bool = false;
 }

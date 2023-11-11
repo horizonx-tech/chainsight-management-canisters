@@ -1,4 +1,4 @@
-use candid::{candid_method, Principal};
+use candid::{candid_method, Nat, Principal};
 use ic_cdk::{
     api::{
         call::msg_cycles_accept128,
@@ -15,7 +15,7 @@ use ic_stable_structures::{
     Cell, DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, str::FromStr, time::Duration};
-use types::types::{Balance, CycleBalance, Index, RefuelTarget};
+use types::types::{Balance, ComponentMetricsSnapshot, CycleBalance, Index, RefuelTarget};
 mod types;
 use crate::types::types::Depositor;
 
@@ -35,10 +35,11 @@ thread_local! {
     static REFUEL_TARGETS: RefCell<ic_stable_structures::Vec<RefuelTarget,Memory>> = RefCell::new(
         ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
     );
+    static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<Vec<ComponentMetricsSnapshot>> = std::cell::RefCell::new(Vec::new());
 }
 
 #[ic_cdk::init]
-fn init(
+async fn init(
     chainsight_caniseter: Principal,
     deployer: Principal,
     initial_supply: Balance,
@@ -49,6 +50,7 @@ fn init(
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
     refuel_targets.iter().for_each(_put_refuel_target);
+    setup_monitoring_component_metrics().await;
 }
 
 #[update]
@@ -280,9 +282,9 @@ async fn get_cycle_balances() -> Vec<CycleBalance> {
         id,
         amount: status.0.cycles,
     });
-  
+
     res.await.into_iter().for_each(|b| balances.push(b));
- 
+
     balances
 }
 
@@ -312,6 +314,53 @@ fn start_refueling(interval_secs: u64) {
     ic_cdk_timers::set_timer_interval(Duration::from_secs(interval_secs), || {
         ic_cdk::spawn(refuel())
     });
+}
+
+#[ic_cdk::query]
+#[candid::candid_method(query)]
+pub fn metric() -> ComponentMetricsSnapshot {
+    COMPONENT_METRICS_SNAPSHOT.with(|m| m.borrow().iter().last().unwrap().clone())
+}
+
+#[ic_cdk::query]
+#[candid::candid_method(query)]
+pub fn metrics(n: usize) -> Vec<ComponentMetricsSnapshot> {
+    COMPONENT_METRICS_SNAPSHOT
+        .with(|m| m.borrow().iter().rev().take(n).cloned().collect::<Vec<_>>())
+}
+
+async fn setup_monitoring_component_metrics() {
+    let unit = 3600;
+    let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
+    let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
+    let delay = round_timestamp(current_time_sec, unit) + unit - current_time_sec;
+
+    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+        ic_cdk_timers::set_timer_interval(std::time::Duration::from_secs(unit as u64), || {
+            ic_cdk::spawn(monitor_component_metrics());
+        });
+    });
+    monitor_component_metrics().await;
+}
+
+async fn monitor_component_metrics() {
+    let timestamp = ic_cdk::api::time();
+    let balances = get_cycle_balances().await;
+    let datum = ComponentMetricsSnapshot {
+        timestamp,
+        cycles: balances
+            .iter()
+            .map(|b| u128::try_from(b.amount.0.clone()).unwrap())
+            .sum(),
+    };
+    ic_cdk::println!("monitoring: {:?}", datum.clone());
+    add_component_metrics_snapshot(datum);
+}
+
+fn add_component_metrics_snapshot(datum: ComponentMetricsSnapshot) {
+    COMPONENT_METRICS_SNAPSHOT.with(|m| {
+        m.borrow_mut().push(datum);
+    })
 }
 
 #[cfg(test)]

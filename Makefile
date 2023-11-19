@@ -3,6 +3,16 @@
 test:
 	$(shell vessel bin)/moc -r $(shell vessel sources) -wasi-system-api test/*Test.mo
 
+build:
+	# rust canister
+	cargo build --target wasm32-unknown-unknown --manifest-path src/canisters/proxy/Cargo.toml
+	cargo build --target wasm32-unknown-unknown --manifest-path src/canisters/proxy/Cargo.toml --release
+	cargo build --target wasm32-unknown-unknown --manifest-path src/canisters/vault/Cargo.toml
+	cargo build --target wasm32-unknown-unknown --manifest-path src/canisters/vault/Cargo.toml --release
+	# motoko canister
+	dfx start --background && dfx canister create _management_canister_registry && dfx build _management_canister_registry && dfx stop
+	cp ./.dfx/local/canisters/_management_canister_registry/_management_canister_registry.wasm ./artifacts/Registry.wasm
+
 create:
 	dfx canister create _management_canister_initializer --specified-id 7fpuj-hqaaa-aaaal-acg7q-cai --network http://localhost:$(port)
 	dfx canister create _management_canister_proxy --specified-id u3zgx-4yaaa-aaaal-achaa-cai --network http://localhost:$(port)

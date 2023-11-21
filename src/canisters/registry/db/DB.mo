@@ -63,4 +63,7 @@ shared ({ caller = owner }) actor class DB({
         );
     };
 
+    public shared ({ caller = caller }) func count() : async Nat {
+        return db.count;
+    };
 };

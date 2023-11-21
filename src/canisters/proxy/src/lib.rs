@@ -267,3 +267,14 @@ fn update_last_execution_result(error: Option<Error>) {
         }
     });
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    candid::export_service!();
+
+    #[test]
+    fn gen_candid() {
+        std::fs::write("proxy.did", __export_service()).unwrap();
+    }
+}

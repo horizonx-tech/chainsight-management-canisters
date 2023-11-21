@@ -11,12 +11,14 @@ use ic_cdk::{
             provisional::{CanisterIdRecord, CanisterSettings},
         },
     },
-    query, update,
+    query, update, pre_upgrade, storage, post_upgrade,
 };
 use std::cell::RefCell;
 
 mod types;
 use types::{InitializeOutput, CycleManagements, RefuelTarget};
+
+use crate::types::UpgradeStableState;
 
 const VAULT_WASM: &[u8] = include_bytes!("../../../../artifacts/vault.wasm.gz");
 const PROXY_WASM: &[u8] = include_bytes!("../../../../artifacts/proxy.wasm.gz");
@@ -192,6 +194,22 @@ async fn register(principal: Principal, vault: Principal) {
     let reg = get_registry();
     let _: CallResult<()> =
         ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
+}
+
+#[pre_upgrade]
+fn pre_upgrade() {
+    ic_cdk::println!("pre_upgrade");
+    let state = UpgradeStableState {
+        registry: get_registry(),
+    };
+    storage::stable_save((state,)).expect("Failed to save stable state");
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    ic_cdk::println!("post_upgrade");
+    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
+    set_registry(state.registry);
 }
 
 #[cfg(test)]

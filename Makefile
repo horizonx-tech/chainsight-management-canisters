@@ -27,4 +27,4 @@ local:
 	dfx canister deposit-cycles 30000000000000 _management_canister_initializer --network http://localhost:$(port)
 
 generate-did:
-	cargo test gen_did
+	cargo test generate_candid

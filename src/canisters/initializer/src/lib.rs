@@ -251,7 +251,7 @@ mod tests {
     candid::export_service!();
 
     #[test]
-    fn gen_candid() {
+    fn generate_candid() {
         std::fs::write("initializer.did", __export_service()).unwrap();
     }
 }

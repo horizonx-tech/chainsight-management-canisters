@@ -44,7 +44,7 @@ thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static TARGET: RefCell<Principal> = RefCell::new(Principal::anonymous());
     static DB: RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
+    // static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
     static INDEXING_CONFIG: std::cell::RefCell<IndexingConfig> = std::cell::RefCell::new(IndexingConfig::default());
     static LAST_SUCCEEDED: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
     static LAST_EXECUTION_RESULT: std::cell::RefCell<ExecutionResult> = std::cell::RefCell::new(ExecutionResult::default());

@@ -3,7 +3,7 @@ use std::cell::RefCell;
 use candid::{candid_method, CandidType, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
-    query, update,
+    query, update, storage, pre_upgrade, post_upgrade,
 };
 use serde::{Deserialize, Serialize};
 
@@ -38,6 +38,16 @@ pub struct ExecutionResult {
 pub struct Error {
     pub message: String,
     // pub backtrace: String,
+}
+
+#[derive(candid::CandidType, candid::Deserialize)]
+pub struct UpgradeStableState {
+    pub registry: Principal,
+    pub target: Principal,
+    pub db: Principal,
+    pub indexing_config: IndexingConfig,
+    pub last_succeeded: u64,
+    pub last_execution_result: ExecutionResult,
 }
 
 thread_local! {
@@ -131,7 +141,7 @@ async fn _proxy_call(caller: Principal, method: String, args: Vec<u8>) -> CallRe
     result
 }
 
-async fn canister_exists(id: Principal) -> bool {
+async fn canister_exists(_id: Principal) -> bool {
     // TODO: payment
     true
     //let known = KNOWN_CANISTERS.with(|canisters| canisters.borrow().contains(&id));
@@ -176,10 +186,18 @@ fn last_succeeded() -> u64 {
     LAST_SUCCEEDED.with(|x| *x.borrow())
 }
 
+fn set_last_succeeded(v: u64) {
+    LAST_SUCCEEDED.with(|x| *x.borrow_mut() = v)
+}
+
 #[query]
 #[candid_method(query)]
 fn last_execution_result() -> ExecutionResult {
     LAST_EXECUTION_RESULT.with(|x| x.borrow().clone())
+}
+
+fn set_last_execution_result(v: ExecutionResult) {
+    LAST_EXECUTION_RESULT.with(|x| *x.borrow_mut() = v)
 }
 
 #[query]
@@ -254,15 +272,41 @@ async fn index() {
 fn update_last_execution_result(error: Option<Error>) {
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u64;
     if error.is_none() {
-        LAST_SUCCEEDED.with(|x| *x.borrow_mut() = current_time_sec);
+        set_last_succeeded(current_time_sec);
     }
-    LAST_EXECUTION_RESULT.with(|x| {
-        *x.borrow_mut() = ExecutionResult {
-            is_succeeded: error.is_none(),
-            timestamp: current_time_sec,
-            error,
-        }
+    set_last_execution_result(ExecutionResult {
+        is_succeeded: error.is_none(),
+        timestamp: current_time_sec,
+        error,
     });
+}
+
+#[pre_upgrade]
+fn pre_upgrade() {
+    ic_cdk::println!("pre_upgrade");
+    let state = UpgradeStableState {
+        registry: _registry(),
+        target: _target(),
+        db: _db(),
+        indexing_config: get_indexing_config(),
+        last_succeeded: last_succeeded(),
+        last_execution_result: last_execution_result(),
+    };
+    storage::stable_save((state,)).expect("Failed to save stable state");
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    ic_cdk::println!("post_upgrade");
+    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
+    set_registry(state.registry);
+    _set_target(state.target);
+    _set_db(state.db);
+    set_last_succeeded(state.last_succeeded);
+    set_last_execution_result(state.last_execution_result);
+
+    // reschedule & set indexing_config, next_schedule
+    start_indexing_internal(state.indexing_config, 0); // temp: delay_secs
 }
 
 #[cfg(test)]

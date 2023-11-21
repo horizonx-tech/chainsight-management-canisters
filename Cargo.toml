@@ -5,5 +5,4 @@ members = [
     "src/canisters/call_dest",
     "src/canisters/vault",
     "src/canisters/initializer",
-    "src/deployment",
 ]

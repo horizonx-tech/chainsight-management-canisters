@@ -10,7 +10,9 @@ create-build:
 	dfx build _management_canister_proxy --network http://localhost:$(port)
 	dfx build _management_canister_vault --network http://localhost:$(port)
 	dfx build _management_canister_registry --network http://localhost:$(port)
-	cp ./.dfx/http___localhost_$(port)/canisters/_management_canister_registry/_management_canister_registry.wasm ./artifacts/Registry.wasm
+	cp ./.dfx/http___localhost_$(port)/canisters/_management_canister_proxy/_management_canister_proxy.wasm.gz ./artifacts/proxy.wasm.gz
+	cp ./.dfx/http___localhost_$(port)/canisters/_management_canister_vault/_management_canister_vault.wasm.gz ./artifacts/vault.wasm.gz
+	cp ./.dfx/http___localhost_$(port)/canisters/_management_canister_registry/_management_canister_registry.wasm.gz ./artifacts/registry.wasm.gz
 	# NOTE: initializer has other component wasm
 	dfx canister create _management_canister_initializer --specified-id 7fpuj-hqaaa-aaaal-acg7q-cai --network http://localhost:$(port)
 	dfx build _management_canister_initializer --network http://localhost:$(port)

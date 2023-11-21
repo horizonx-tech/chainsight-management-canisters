@@ -22,20 +22,9 @@ pub struct InitializeOutput {
     pub db: Principal,
 }
 
-#[cfg(debug_cfg)]
-const VAULT_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/debug/vault.wasm");
-#[cfg(not(debug_cfg))]
-const VAULT_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/release/vault.wasm");
-#[cfg(debug_cfg)]
-const PROXY_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/debug/proxy.wasm");
-#[cfg(not(debug_cfg))]
-const PROXY_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/release/proxy.wasm");
-
-const DB_WASM: &[u8] = include_bytes!("../../../../artifacts/Registry.wasm");
+const VAULT_WASM: &[u8] = include_bytes!("../../../../artifacts/vault.wasm.gz");
+const PROXY_WASM: &[u8] = include_bytes!("../../../../artifacts/proxy.wasm.gz");
+const DB_WASM: &[u8] = include_bytes!("../../../../artifacts/registry.wasm.gz");
 
 thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());

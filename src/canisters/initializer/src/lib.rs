@@ -1,4 +1,4 @@
-use candid::{candid_method, encode_args, CandidType, Principal};
+use candid::{candid_method, encode_args, Principal};
 use ic_cdk::{
     api::{
         call::CallResult,
@@ -15,12 +15,8 @@ use ic_cdk::{
 };
 use std::cell::RefCell;
 
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-pub struct InitializeOutput {
-    pub vault: Principal,
-    pub proxy: Principal,
-    pub db: Principal,
-}
+mod types;
+use types::{InitializeOutput, CycleManagements, RefuelTarget};
 
 const VAULT_WASM: &[u8] = include_bytes!("../../../../artifacts/vault.wasm.gz");
 const PROXY_WASM: &[u8] = include_bytes!("../../../../artifacts/proxy.wasm.gz");
@@ -30,40 +26,16 @@ thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
-fn registry() -> Principal {
+#[query]
+#[candid_method(query)]
+fn get_registry() -> Principal {
     REGISTRY.with(|r| r.borrow().clone())
 }
 
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-struct CycleManagement {
-    initial_supply: u128,
-    refueling_amount: u128,
-    refueling_threshold: u128,
-}
-
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-struct CycleManagements {
-    refueling_interval: u64,
-    vault_intial_supply: u128,
-    indexer: CycleManagement,
-    db: CycleManagement,
-    proxy: CycleManagement,
-}
-
-impl CycleManagements {
-    fn initial_supply(&self) -> u128 {
-        self.vault_intial_supply
-            + self.indexer.initial_supply
-            + self.db.initial_supply
-            + self.proxy.initial_supply
-    }
-}
-
-#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
-pub struct RefuelTarget {
-    pub id: Principal,
-    pub amount: u128,
-    pub threshold: u128,
+#[update]
+#[candid_method(update)]
+fn set_registry(id: Principal) {
+    REGISTRY.with(|registry| *registry.borrow_mut() = id);
 }
 
 #[update]
@@ -116,11 +88,6 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     );
 
     InitializeOutput { vault, proxy, db }
-}
-
-#[query]
-fn get_registry() -> Principal {
-    registry()
 }
 
 async fn install_vault(
@@ -178,16 +145,6 @@ async fn init_db(db: Principal) -> CallResult<()> {
     out
 }
 
-async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
-    install_code(InstallCodeArgument {
-        mode: CanisterInstallMode::Reinstall,
-        canister_id,
-        wasm_module,
-        arg,
-    })
-    .await
-}
-
 async fn install_proxy(created: Principal, target: Principal, db: Principal) -> CallResult<()> {
     let canister_id = created.clone();
     let registry = get_registry();
@@ -196,6 +153,16 @@ async fn install_proxy(created: Principal, target: Principal, db: Principal) -> 
         PROXY_WASM.to_vec(),
         encode_args((registry, target, db)).unwrap(),
     )
+    .await
+}
+
+async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
+    install_code(InstallCodeArgument {
+        mode: CanisterInstallMode::Reinstall,
+        canister_id,
+        wasm_module,
+        arg,
+    })
     .await
 }
 
@@ -221,15 +188,8 @@ async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
     Ok(canister_id)
 }
 
-#[update]
-fn set_registry(id: Principal) {
-    REGISTRY.with(|registry| {
-        *registry.borrow_mut() = id;
-    });
-}
-
 async fn register(principal: Principal, vault: Principal) {
-    let reg = registry();
+    let reg = get_registry();
     let _: CallResult<()> =
         ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
 }

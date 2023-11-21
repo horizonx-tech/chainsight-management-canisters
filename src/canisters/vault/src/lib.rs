@@ -14,7 +14,7 @@ use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
     DefaultMemoryImpl, StableBTreeMap, writer::Writer, Memory,
 };
-use std::{cell::RefCell, str::FromStr, time::Duration};
+use std::{cell::RefCell, time::Duration};
 use types::{
     Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget, UpgradeStableState,
 };

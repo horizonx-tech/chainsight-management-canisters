@@ -7,7 +7,7 @@ use candid::{CandidType, Decode, Encode, Nat, Principal};
 use ic_stable_structures::{BoundedStorable, Storable};
 use serde::Deserialize;
 
-#[derive(CandidType, Deserialize, Default, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
+#[derive(CandidType, serde::Serialize, Deserialize, Default, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct Balance(u128);
 
 impl From<u128> for Balance {
@@ -30,7 +30,7 @@ impl Balance {
     }
 }
 
-#[derive(CandidType, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
+#[derive(CandidType, serde::Serialize, Deserialize, Clone, PartialEq, PartialOrd, Eq, Ord, Debug)]
 pub struct Index(u128);
 
 impl Index {
@@ -163,6 +163,24 @@ impl BoundedStorable for ComponentMetricsSnapshot {
     const IS_FIXED_SIZE: bool = false;
 }
 
+#[derive(CandidType, serde::Serialize, serde::Deserialize, Clone, PartialEq, Debug)]
+pub struct UpgradeStableState {
+    pub target_canister_id: Principal,
+    pub total_supply: Balance,
+    pub index: Index
+}
+impl UpgradeStableState {
+    pub fn to_cbor(&self) -> Vec<u8> {
+        let mut state_bytes = vec![];
+        ciborium::ser::into_writer(self, &mut state_bytes).expect("Failed to serialize state");
+        state_bytes
+    }
+
+    pub fn from_cbor(bytes: &[u8]) -> Self {
+        ciborium::de::from_reader(bytes).expect("Failed to deserialize state")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -230,5 +248,16 @@ mod tests {
             amount: 200,
         };
         assert_eq!(setting, RefuelTarget::from_bytes(setting.to_bytes()));
+    }
+
+    #[test]
+    fn test_upgrade_stable_state() {
+        let state = UpgradeStableState {
+            target_canister_id: Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap(),
+            total_supply: Balance::from(1),
+            index: Index::from(2),
+        };
+        let state_bytes = state.clone().to_cbor();
+        assert_eq!(state, UpgradeStableState::from_cbor(&state_bytes));
     }
 }

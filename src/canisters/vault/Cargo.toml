@@ -17,3 +17,4 @@ serde.workspace = true
 
 rpc = { path = "../rpc" }
 futures = "0.3.29"
+ciborium = "0.2.1"

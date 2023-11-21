@@ -15,7 +15,7 @@ use ic_stable_structures::{
     DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, str::FromStr, time::Duration};
-use types::types::{
+use types::{
     Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget,
 };
 mod types;

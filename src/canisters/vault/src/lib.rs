@@ -43,7 +43,9 @@ thread_local! {
             MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
         )
     );
-    static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<Vec<ComponentMetricsSnapshot>> = std::cell::RefCell::new(Vec::new());
+    static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<ic_stable_structures::Vec<ComponentMetricsSnapshot,Memory>> = RefCell::new(
+        ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))).unwrap()
+    );
 }
 
 #[ic_cdk::init]
@@ -334,14 +336,24 @@ fn start_refueling(interval_secs: u64) {
 #[ic_cdk::query]
 #[candid::candid_method(query)]
 pub fn metric() -> ComponentMetricsSnapshot {
-    COMPONENT_METRICS_SNAPSHOT.with(|m| m.borrow().iter().last().unwrap().clone())
+    COMPONENT_METRICS_SNAPSHOT.with(|m| m.borrow().iter().last().expect("No metrics").clone())
 }
 
 #[ic_cdk::query]
 #[candid::candid_method(query)]
-pub fn metrics(n: usize) -> Vec<ComponentMetricsSnapshot> {
-    COMPONENT_METRICS_SNAPSHOT
-        .with(|m| m.borrow().iter().rev().take(n).cloned().collect::<Vec<_>>())
+pub fn metrics(n: u64) -> Vec<ComponentMetricsSnapshot> {
+    COMPONENT_METRICS_SNAPSHOT.with(|m| {
+        let borrowed_mem = m.borrow();
+        let len = borrowed_mem.len();
+        let mut res = Vec::new();
+        for i in 0..n {
+            if i >= len {
+                break;
+            }
+            res.push(borrowed_mem.get(len - i - 1).unwrap());
+        }
+        res
+    })
 }
 
 async fn start_monitoring_component_metrics(interval_secs: u64) {
@@ -375,9 +387,7 @@ async fn monitor_component_metrics() {
 }
 
 fn add_component_metrics_snapshot(datum: ComponentMetricsSnapshot) {
-    COMPONENT_METRICS_SNAPSHOT.with(|m| {
-        m.borrow_mut().push(datum);
-    })
+    COMPONENT_METRICS_SNAPSHOT.with(|m| m.borrow_mut().push(&datum).unwrap());
 }
 
 #[query]
@@ -490,5 +500,43 @@ mod tests {
         _put_refuel_target(&target1);
         assert_eq!(get_refuel_targets()[0].amount, 300);
         assert_eq!(get_refuel_targets().len(), 2);
+    }
+
+    #[test]
+    fn test_metrics() {
+        let snap1 = ComponentMetricsSnapshot {
+            timestamp: 1,
+            cycles: 100,
+        };
+        let snap2 = ComponentMetricsSnapshot {
+            timestamp: 2,
+            cycles: 90,
+        };
+        let snap3 = ComponentMetricsSnapshot {
+            timestamp: 3,
+            cycles: 80,
+        };
+        add_component_metrics_snapshot(snap1.clone());
+        add_component_metrics_snapshot(snap2.clone());
+        add_component_metrics_snapshot(snap3.clone());
+
+        assert_eq!(metric(), snap3.clone());
+        assert_eq!(metrics(2), vec![snap3.clone(), snap2.clone()]);
+
+        let snap4 = ComponentMetricsSnapshot {
+            timestamp: 4,
+            cycles: 70,
+        };
+        add_component_metrics_snapshot(snap4.clone());
+
+        assert_eq!(metric(), snap4.clone());
+        assert_eq!(metrics(3), vec![snap4.clone(), snap3.clone(), snap2.clone()]);
+
+    }
+
+    #[test]
+    #[should_panic(expected = "No metrics")]
+    fn test_metric_when_no_monitor() {
+        metric();
     }
 }

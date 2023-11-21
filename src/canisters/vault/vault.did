@@ -13,7 +13,7 @@ service : {
   put_refuel_target : (RefuelTarget) -> ();
   receive_revenue : () -> ();
   refuel : () -> ();
-  set_canister : (principal) -> (bool);
+  set_canister : (principal) -> ();
   share_of : (principal) -> (nat) query;
   supply : (opt principal) -> ();
   target_canister : () -> (principal) query;

@@ -12,7 +12,7 @@ use ic_cdk::{
 };
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
-    Cell, DefaultMemoryImpl, StableBTreeMap,
+    DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, str::FromStr, time::Duration};
 use types::types::{
@@ -27,25 +27,29 @@ const MONITROING_INTERVAL_SECS: u64 = 3600;
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
         RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+
+    // stable memory
     static SHARE_MAP: RefCell<StableBTreeMap<PrincipalStorable, Index, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(0))),
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1))),
         )
     );
-    static TOTAL_SUPPLY: RefCell<Cell<Balance,Memory>> = RefCell::new(Cell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1))), Balance::default()).unwrap());
-    static CHAINSIGHT_CANISTER_ID : RefCell<Cell<String,Memory>> = RefCell::new(Cell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2))), "".to_string()).unwrap());
-    static INDEX: RefCell<Cell<Index,Memory>> = RefCell::new(Cell::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))), Index::default()).unwrap());
     static REFUEL_TARGETS: RefCell<ic_stable_structures::Vec<RefuelTarget,Memory>> = RefCell::new(
-        ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
+        ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2)))).unwrap()
     );
     static CUMULATIVE_REFUELED: RefCell<StableBTreeMap<PrincipalStorable, u128, Memory>> = RefCell::new(
         StableBTreeMap::init(
-            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))),
         )
     );
     static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<ic_stable_structures::Vec<ComponentMetricsSnapshot,Memory>> = RefCell::new(
-        ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6)))).unwrap()
+        ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
     );
+
+    // heap memory
+    static TOTAL_SUPPLY: RefCell<Balance> = RefCell::new(Balance::default());
+    static CHAINSIGHT_CANISTER_ID : RefCell<String> = RefCell::new(Default::default());
+    static INDEX: RefCell<Index> = RefCell::new(Index::default());
 }
 
 #[ic_cdk::init]
@@ -57,7 +61,7 @@ async fn init(
     refuel_targets: Vec<RefuelTarget>,
     refuel_targets_inital_supply: Vec<(Principal, u128)>,
 ) {
-    set_chainsight_canister_id(chainsight_caniseter);
+    _set_target_canister(chainsight_caniseter);
     increase_index(&initial_supply, deployer);
     start_refueling(refueling_interval_secs);
     refuel_targets.iter().for_each(_put_refuel_target);
@@ -99,13 +103,13 @@ async fn withdraw(delta: Balance) {
 #[query]
 #[candid_method(query)]
 fn total_supply() -> Balance {
-    TOTAL_SUPPLY.with(|m| m.borrow().get().clone())
+    TOTAL_SUPPLY.with(|m| m.borrow().clone())
 }
 
 #[query]
 #[candid_method(query)]
 fn index() -> Index {
-    INDEX.with(|m| m.borrow().get().clone())
+    INDEX.with(|m| m.borrow().clone())
 }
 
 #[query]
@@ -147,12 +151,12 @@ fn decrease_index(delta: &Balance, principal: Principal) {
 
 fn add_total_supply(value: &Balance, neg: bool) {
     TOTAL_SUPPLY.with(|m| {
-        let balance: Balance = m.borrow().get().clone();
+        let balance: Balance = m.borrow().clone();
         let after = match neg {
             true => balance.sub(value),
             false => balance.add(value),
         };
-        m.borrow_mut().set(after.into()).unwrap();
+        *m.borrow_mut() = after;
     })
 }
 
@@ -164,7 +168,7 @@ fn add_index(delta: &Balance, neg: bool) {
             true => current.sub(idx),
             false => current.add(idx),
         };
-        m.borrow_mut().set(after).unwrap();
+        *m.borrow_mut() = after;
     });
 }
 
@@ -183,9 +187,7 @@ fn add_share(principal: Principal, delta: &Balance, neg: bool) {
 fn salvage_stray_cycles() {
     let actual_balance: Balance = canister_balance128().into();
     if actual_balance > total_supply() {
-        TOTAL_SUPPLY.with(|m| {
-            m.borrow_mut().set(actual_balance).unwrap();
-        })
+        TOTAL_SUPPLY.with(|m| *m.borrow_mut() = actual_balance)
     }
 }
 
@@ -193,9 +195,7 @@ fn salvage_stray_cycles() {
 #[candid_method(update)]
 fn receive_revenue() {
     let accepted = msg_cycles_accept128(u128::MAX);
-    if accepted == 0 {
-        panic!("No cycles received")
-    }
+    assert!(accepted > 0, "No cycles received");
     add_total_supply(&Balance::from(accepted), false);
 }
 
@@ -308,23 +308,17 @@ async fn get_cycle_balances() -> Vec<CycleBalance> {
 #[query]
 #[candid_method(query)]
 fn target_canister() -> Principal {
-    CHAINSIGHT_CANISTER_ID.with(|c| Principal::from_str(c.borrow().get().as_str()).unwrap())
+    CHAINSIGHT_CANISTER_ID.with(|c| Principal::from_str(&c.borrow()).unwrap())
 }
 
 #[update]
 #[candid_method(update)]
-fn set_canister(principal: Principal) -> bool {
-    let result = CHAINSIGHT_CANISTER_ID.with(|c| c.borrow_mut().set(principal.to_text()));
-    match result {
-        Ok(_) => true,
-        Err(_) => false,
-    }
+fn set_canister(principal: Principal) {
+    _set_target_canister(principal);
 }
 
-fn set_chainsight_canister_id(principal: Principal) {
-    CHAINSIGHT_CANISTER_ID.with(|m| {
-        m.borrow_mut().set(principal.to_string()).unwrap();
-    })
+fn _set_target_canister(principal: Principal) {
+    CHAINSIGHT_CANISTER_ID.with(|m| *m.borrow_mut() = principal.to_string())
 }
 
 fn start_refueling(interval_secs: u64) {

@@ -14,5 +14,4 @@ ic-cdk = "0.7"
 ic-cdk-timers = "0.1" # Feel free to remove this dependency if you don't need timers
 ic-stable-structures = "0.5.4"
 rpc = { path = "../rpc" }
-common = { path = "../common" }
 serde = "1.0.164"

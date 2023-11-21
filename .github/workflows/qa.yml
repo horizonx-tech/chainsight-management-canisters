@@ -25,5 +25,9 @@ jobs:
           rustup update ${{ env.RUST_VERSION }} --no-self-update
           rustup default ${{ env.RUST_VERSION }}
           rustup target add wasm32-unknown-unknown
-      - name: Build
-        run: cargo build --target wasm32-unknown-unknown --locked --release
+      - name: Build proxy
+        run: cargo build --target wasm32-unknown-unknown --locked --release -p proxy
+      - name: Build vault
+        run: cargo build --target wasm32-unknown-unknown --locked --release -p vault
+      - name: Build initializer
+        run: cargo build --target wasm32-unknown-unknown --locked --release -p initializer

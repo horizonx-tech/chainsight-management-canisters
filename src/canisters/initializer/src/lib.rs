@@ -198,18 +198,24 @@ async fn register(principal: Principal, vault: Principal) {
 
 #[pre_upgrade]
 fn pre_upgrade() {
-    ic_cdk::println!("pre_upgrade");
+    ic_cdk::println!("start: pre_upgrade");
+
     let state = UpgradeStableState {
         registry: get_registry(),
     };
     storage::stable_save((state,)).expect("Failed to save stable state");
+
+    ic_cdk::println!("finish: pre_upgrade");
 }
 
 #[post_upgrade]
 fn post_upgrade() {
-    ic_cdk::println!("post_upgrade");
+    ic_cdk::println!("start: post_upgrade");
+
     let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
     set_registry(state.registry);
+
+    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

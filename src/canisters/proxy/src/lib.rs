@@ -283,7 +283,8 @@ fn update_last_execution_result(error: Option<Error>) {
 
 #[pre_upgrade]
 fn pre_upgrade() {
-    ic_cdk::println!("pre_upgrade");
+    ic_cdk::println!("start: pre_upgrade");
+
     let state = UpgradeStableState {
         registry: _registry(),
         target: _target(),
@@ -293,11 +294,14 @@ fn pre_upgrade() {
         last_execution_result: last_execution_result(),
     };
     storage::stable_save((state,)).expect("Failed to save stable state");
+
+    ic_cdk::println!("finish: pre_upgrade");
 }
 
 #[post_upgrade]
 fn post_upgrade() {
-    ic_cdk::println!("post_upgrade");
+    ic_cdk::println!("start: post_upgrade");
+
     let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
     set_registry(state.registry);
     _set_target(state.target);
@@ -307,6 +311,8 @@ fn post_upgrade() {
 
     // reschedule & set indexing_config, next_schedule
     start_indexing_internal(state.indexing_config, 0); // temp: delay_secs
+
+    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

@@ -424,6 +424,8 @@ fn get_upgrades_memory() -> MemoryType {
 
 #[pre_upgrade]
 fn pre_upgrade() {
+    ic_cdk::println!("start: pre_upgrade");
+
     let state = UpgradeStableState {
         target_canister_id: target_canister(),
         total_supply: total_supply(),
@@ -435,11 +437,15 @@ fn pre_upgrade() {
     let mut memory = get_upgrades_memory();
     let mut writer = Writer::new(&mut memory, 0);
     writer.write(&len.to_le_bytes()).unwrap();
-    writer.write(&state_bytes).unwrap()
+    writer.write(&state_bytes).unwrap();
+
+    ic_cdk::println!("finish: pre_upgrade");
 }
 
 #[post_upgrade]
 fn post_upgrade() {
+    ic_cdk::println!("start: post_upgrade");
+
     let memory = get_upgrades_memory();
 
     // Read the length of the state bytes.
@@ -456,6 +462,8 @@ fn post_upgrade() {
     _set_target_canister(state.target_canister_id);
     set_total_supply(state.total_supply);
     set_index(state.index);
+
+    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

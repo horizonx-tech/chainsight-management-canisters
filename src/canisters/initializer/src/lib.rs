@@ -244,3 +244,14 @@ async fn register(principal: Principal, vault: Principal) {
     let _: CallResult<()> =
         ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    candid::export_service!();
+
+    #[test]
+    fn gen_candid() {
+        std::fs::write("initializer.did", __export_service()).unwrap();
+    }
+}

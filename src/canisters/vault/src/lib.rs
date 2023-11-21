@@ -409,6 +409,13 @@ fn record_cumulative_refueled(target: Principal, amount: u128) {
 mod tests {
     use super::*;
 
+    candid::export_service!();
+
+    #[test]
+    fn gen_candid() {
+        std::fs::write("vault.did", __export_service()).unwrap();
+    }
+
     #[test]
     fn test_index() {
         let depositor1 = Principal::from_text("vvqfh-4aaaa-aaaao-a2mua-cai").unwrap();

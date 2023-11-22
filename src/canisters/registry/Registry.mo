@@ -118,7 +118,6 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         ([
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
-            await createServiceCanister("Vaults"),
         ]);
     };
 

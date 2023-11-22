@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use candid::{candid_method, CandidType, Int, Principal};
 use ic_cdk::{
-    api::call::{CallResult, RejectionCode},
+    api::{call::{CallResult, RejectionCode}, management_canister::provisional::CanisterIdRecord},
     query, update, storage, pre_upgrade, post_upgrade,
 };
 use serde::{Deserialize, Serialize};
@@ -279,6 +279,21 @@ fn update_last_execution_result(error: Option<Error>) {
         timestamp: current_time_sec,
         error,
     });
+}
+
+#[update]
+#[candid_method(update)]
+async fn request_upgrades_to_registry(initializer: Principal) -> CallResult<()> {
+    let caller = ic_cdk::caller();
+
+    // NOTE: use `is_controller` if ic-cdk >= 0.8
+    let status = ic_cdk::api::management_canister::main::canister_status(CanisterIdRecord {
+        canister_id: ic_cdk::api::id(),
+    }).await.expect("Failed to get canister status").0;
+    assert!(status.settings.controllers.contains(&caller), "Not controlled");
+
+    // TODO: get initializer addr from somewhere
+    ic_cdk::api::call::call(initializer, "upgrade_proxies", ()).await
 }
 
 #[pre_upgrade]

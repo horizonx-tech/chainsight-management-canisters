@@ -24,6 +24,7 @@ type Result = variant {
   Ok : record { vec nat8 };
   Err : record { RejectionCode; text };
 };
+type Result_1 = variant { Ok; Err : record { RejectionCode; text } };
 service : {
   db : () -> (principal) query;
   get_indexing_config : () -> (IndexingConfig) query;
@@ -33,6 +34,7 @@ service : {
   next_schedule : () -> (nat64) query;
   proxy_call : (text, vec nat8) -> (Result);
   registry : () -> (principal) query;
+  request_upgrades_to_registry : (principal) -> (Result_1);
   set_registry : (principal) -> ();
   start_indexing : (nat32, nat32, text, vec nat8) -> ();
   target : () -> (principal) query;

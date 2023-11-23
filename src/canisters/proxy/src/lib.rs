@@ -9,15 +9,10 @@ use serde::{Deserialize, Serialize};
 
 #[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct CallLog {
-    canister: Canister,
+    canister: Principal,
     #[serde(rename = "interactTo")]
-    interact_to: Canister,
+    interact_to: Principal,
     at: Int,
-}
-
-#[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct Canister {
-    principal: Principal,
 }
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
@@ -103,9 +98,9 @@ fn init(registry: Principal, target: Principal, db: Principal) {
 
 #[update]
 #[candid_method(update)]
-async fn list_logs(from: Int, to: Int) -> Vec<CallLog> {
+async fn list_logs(target: Principal, from: Int, to: Int) -> Vec<CallLog> {
     let call_result: CallResult<(Vec<CallLog>,)> =
-        ic_cdk::api::call::call(_registry(), "listLogsOf", (_target(), from, to)).await;
+        ic_cdk::api::call::call(_db(), "listLogsOf", (target, from, to)).await;
     match call_result {
         Ok((logs,)) => logs,
         Err(err) => {

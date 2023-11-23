@@ -3,6 +3,11 @@ type CallLog = record {
   interactTo : principal;
   canister : principal;
 };
+type ComponentInfo = record {
+  db : principal;
+  vault : principal;
+  target : principal;
+};
 type Error = record { message : text };
 type ExecutionResult = record {
   is_succeeded : bool;
@@ -29,6 +34,7 @@ type Result = variant {
 };
 service : {
   db : () -> (principal) query;
+  get_component_info : () -> (ComponentInfo) query;
   get_indexing_config : () -> (IndexingConfig) query;
   initializer : () -> (principal) query;
   last_execution_result : () -> (ExecutionResult) query;
@@ -41,4 +47,5 @@ service : {
   set_registry : (principal) -> ();
   start_indexing : (nat32, nat32, text, vec nat8) -> ();
   target : () -> (principal) query;
+  vault : () -> (principal) query;
 }

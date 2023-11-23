@@ -16,7 +16,7 @@ use ic_cdk::{
 use std::cell::RefCell;
 
 mod types;
-use types::{InitializeOutput, CycleManagements, RefuelTarget, RegisteredCanisterInRegistry};
+use types::{InitializeOutput, CycleManagements, RefuelTarget, RegisteredCanisterInRegistry, ComponentInfoFromProxy};
 
 use crate::types::UpgradeStableState;
 
@@ -70,7 +70,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     let proxy = create_new_canister(cycles.proxy.initial_supply)
         .await
         .unwrap();
-    install_proxy(proxy, principal, db).await.unwrap();
+    install_proxy(proxy, principal, db, vault).await.unwrap();
     after_install(&proxy, controllers).await.unwrap();
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
@@ -147,13 +147,13 @@ async fn init_db(db: Principal) -> CallResult<()> {
     out
 }
 
-async fn install_proxy(created: Principal, target: Principal, db: Principal) -> CallResult<()> {
+async fn install_proxy(created: Principal, target: Principal, db: Principal, vault: Principal) -> CallResult<()> {
     let canister_id = created.clone();
     let registry = get_registry();
     _install(
         canister_id,
         PROXY_WASM.to_vec(),
-        encode_args((registry, target, db)).unwrap(),
+        encode_args((registry, target, db, vault)).unwrap(),
     )
     .await
 }
@@ -201,7 +201,7 @@ async fn register(principal: Principal, vault: Principal) {
 async fn upgrade_proxies() {
     let caller_proxy = ic_cdk::caller();
     let registry = get_registry();
-    let component_canister = get_target_of_proxy(caller_proxy.clone())
+    let ComponentInfoFromProxy { target: component_canister, vault, db } = get_component_info_of_proxy(caller_proxy.clone())
         .await
         .expect("Failed to call 'target' to Proxy")
         .0;
@@ -209,10 +209,6 @@ async fn upgrade_proxies() {
     // check if caller is a registered proxy
     let res = get_registered_canister_in_db(registry, component_canister).await.expect("Failed to call 'getRegisteredCanister' to Registry");
     assert!(res.0.is_some(), "Caller is not a registered proxy");
-
-    // get targets to upgrade
-    let RegisteredCanisterInRegistry { principal: _, vault } = res.0.unwrap();
-    let db = get_db_from_proxy(caller_proxy.clone()).await.expect("Failed to call 'db' to Proxy").0;
 
     // install_code with upgrade mode
     let _ = install_for_upgrade(db, DB_WASM.to_vec(), vec![]).await.expect("Failed to upgrade DB for proxy");
@@ -230,13 +226,8 @@ async fn install_for_upgrade(canister_id: Principal, wasm_module: Vec<u8>, arg: 
     .await
 }
 
-async fn get_target_of_proxy(proxy: Principal) -> CallResult<(Principal,)> {
-    let out: CallResult<(Principal,)> = ic_cdk::api::call::call(proxy, "target", ()).await;
-    out
-}
-
-async fn get_db_from_proxy(proxy: Principal) -> CallResult<(Principal,)> {
-    let out: CallResult<(Principal,)> = ic_cdk::api::call::call(proxy, "db", ()).await;
+async fn get_component_info_of_proxy(proxy: Principal) -> CallResult<(ComponentInfoFromProxy,)> {
+    let out: CallResult<(ComponentInfoFromProxy,)> = ic_cdk::api::call::call(proxy, "get_component_info", ()).await;
     out
 }
 

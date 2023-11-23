@@ -36,12 +36,12 @@ module LogRepository {
 
         public func list(canister : Principal, from : Time.Time, to : ?Time.Time) : async ([Log.CallLog]) {
             let upperBound = switch (to) {
-                case (?t) { TimeStampedSk.callLogSK(canister, t) };
+                case (?t) { TimeStampedSk.calledLogSK(canister, t) };
                 case (null) {
-                    TimeStampedSk.callLogSK(canister, Time.now());
+                    TimeStampedSk.calledLogSK(canister, Time.now());
                 };
             };
-            let lowerBound = TimeStampedSk.callLogSK(canister, from);
+            let lowerBound = TimeStampedSk.calledLogSK(canister, from);
             let { entities; nextKey } = await db.scan({
                 skLowerBound = lowerBound;
                 skUpperBound = upperBound;

@@ -2,7 +2,7 @@ use std::cell::RefCell;
 
 use candid::{candid_method, CandidType, Int, Principal};
 use ic_cdk::{
-    api::{call::{CallResult, RejectionCode}, management_canister::provisional::CanisterIdRecord},
+    api::call::{CallResult, RejectionCode},
     query, update, storage, pre_upgrade, post_upgrade,
 };
 use serde::{Deserialize, Serialize};
@@ -298,16 +298,17 @@ fn update_last_execution_result(error: Option<Error>) {
 
 #[update]
 #[candid_method(update)]
-async fn request_upgrades_to_registry() -> CallResult<()> {
-    let caller = ic_cdk::caller();
-
+async fn request_upgrades_to_registry() {
+    //// TODO: validation, should it be called from the main body canister?
+    // let caller = ic_cdk::caller();
     // NOTE: use `is_controller` if ic-cdk >= 0.8
-    let status = ic_cdk::api::management_canister::main::canister_status(CanisterIdRecord {
-        canister_id: ic_cdk::api::id(),
-    }).await.expect("Failed to get canister status").0;
-    assert!(status.settings.controllers.contains(&caller), "Not controlled");
+    // let status = ic_cdk::api::management_canister::main::canister_status(CanisterIdRecord {
+    //     canister_id: ic_cdk::api::id(),
+    // }).await.expect("Failed to get canister status").0;
+    // assert!(status.settings.controllers.contains(&caller), "Not controlled");
 
-    ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await
+    let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
+    res.expect("Failed to call 'upgrade_proxies' to Initializer");
 }
 
 #[pre_upgrade]

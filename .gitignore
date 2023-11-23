@@ -16,9 +16,6 @@ src/canisters/declarations/
 
 # rust
 target/
-!target//wasm32-unknown-unknown/release/initializer.wasm
-!target/wasm32-unknown-unknown/release/proxy.wasm
-!target/wasm32-unknown-unknown/release/registry.wasm
 
 # frontend code
 node_modules/
@@ -31,3 +28,7 @@ dist/
 # motoko temporary files
 .vessel/
 local/
+
+# customize
+/artifacts/*
+!/artifacts/*.wasm.gz

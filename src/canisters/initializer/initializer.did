@@ -15,4 +15,8 @@ type InitializeOutput = record {
   vault : principal;
   proxy : principal;
 };
-service : { initialize : (principal, CycleManagements) -> (InitializeOutput) }
+service : {
+  get_registry : () -> (principal) query;
+  initialize : (principal, CycleManagements) -> (InitializeOutput);
+  set_registry : (principal) -> ();
+}

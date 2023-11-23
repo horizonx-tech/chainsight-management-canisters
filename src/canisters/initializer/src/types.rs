@@ -39,6 +39,12 @@ pub struct RefuelTarget {
     pub threshold: u128,
 }
 
+#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RegisteredCanisterInRegistry {
+    pub principal: Principal,
+    pub vault: Principal,
+}
+
 #[derive(CandidType, serde::Deserialize)]
 pub struct UpgradeStableState {
     pub registry: Principal,

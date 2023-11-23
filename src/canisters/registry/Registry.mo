@@ -93,12 +93,17 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     };
 
     public shared func exists(principal : Principal) : async Bool {
-        for (repo in listCanisterRepositories().vals()) {
-            if ((await repo.get(principal)) != null) {
-                return true;
-            };
+        switch (await getRegisteredCanister(principal)) {
+            case (null) { return false };
+            case (?canister) { return true };
         };
-        return false;
+    };
+
+    public shared func getRegisteredCanister(principal : Principal) : async ?Canister.Canister {
+        for (repo in listCanisterRepositories().vals()) {
+            return await repo.get(principal);
+        };
+        return null;
     };
 
     public shared func scanCanisters() : async [Canister.Canister] {

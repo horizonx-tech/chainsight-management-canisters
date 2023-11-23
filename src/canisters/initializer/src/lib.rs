@@ -1,4 +1,4 @@
-use candid::{candid_method, encode_args, CandidType, Principal};
+use candid::{candid_method, encode_args, Principal};
 use ic_cdk::{
     api::{
         call::CallResult,
@@ -11,70 +11,33 @@ use ic_cdk::{
             provisional::{CanisterIdRecord, CanisterSettings},
         },
     },
-    query, update,
+    query, update, pre_upgrade, storage, post_upgrade,
 };
 use std::cell::RefCell;
 
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-pub struct InitializeOutput {
-    pub vault: Principal,
-    pub proxy: Principal,
-    pub db: Principal,
-}
+mod types;
+use types::{InitializeOutput, CycleManagements, RefuelTarget, RegisteredCanisterInRegistry};
 
-#[cfg(debug_cfg)]
-const VAULT_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/debug/vault.wasm");
-#[cfg(not(debug_cfg))]
-const VAULT_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/release/vault.wasm");
-#[cfg(debug_cfg)]
-const PROXY_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/debug/proxy.wasm");
-#[cfg(not(debug_cfg))]
-const PROXY_WASM: &[u8] =
-    include_bytes!("../../../../target/wasm32-unknown-unknown/release/proxy.wasm");
+use crate::types::UpgradeStableState;
 
-const DB_WASM: &[u8] = include_bytes!("../../../../artifacts/Registry.wasm");
+const VAULT_WASM: &[u8] = include_bytes!("../../../../artifacts/vault.wasm.gz");
+const PROXY_WASM: &[u8] = include_bytes!("../../../../artifacts/proxy.wasm.gz");
+const DB_WASM: &[u8] = include_bytes!("../../../../artifacts/registry.wasm.gz");
 
 thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
 }
 
-fn registry() -> Principal {
+#[query]
+#[candid_method(query)]
+fn get_registry() -> Principal {
     REGISTRY.with(|r| r.borrow().clone())
 }
 
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-struct CycleManagement {
-    initial_supply: u128,
-    refueling_amount: u128,
-    refueling_threshold: u128,
-}
-
-#[derive(CandidType, serde::Deserialize, Clone, Copy)]
-struct CycleManagements {
-    refueling_interval: u64,
-    vault_intial_supply: u128,
-    indexer: CycleManagement,
-    db: CycleManagement,
-    proxy: CycleManagement,
-}
-
-impl CycleManagements {
-    fn initial_supply(&self) -> u128 {
-        self.vault_intial_supply
-            + self.indexer.initial_supply
-            + self.db.initial_supply
-            + self.proxy.initial_supply
-    }
-}
-
-#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
-pub struct RefuelTarget {
-    pub id: Principal,
-    pub amount: u128,
-    pub threshold: u128,
+#[update]
+#[candid_method(update)]
+fn set_registry(id: Principal) {
+    REGISTRY.with(|registry| *registry.borrow_mut() = id);
 }
 
 #[update]
@@ -127,11 +90,6 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     );
 
     InitializeOutput { vault, proxy, db }
-}
-
-#[query]
-fn get_registry() -> Principal {
-    registry()
 }
 
 async fn install_vault(
@@ -189,16 +147,6 @@ async fn init_db(db: Principal) -> CallResult<()> {
     out
 }
 
-async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
-    install_code(InstallCodeArgument {
-        mode: CanisterInstallMode::Reinstall,
-        canister_id,
-        wasm_module,
-        arg,
-    })
-    .await
-}
-
 async fn install_proxy(created: Principal, target: Principal, db: Principal) -> CallResult<()> {
     let canister_id = created.clone();
     let registry = get_registry();
@@ -207,6 +155,16 @@ async fn install_proxy(created: Principal, target: Principal, db: Principal) -> 
         PROXY_WASM.to_vec(),
         encode_args((registry, target, db)).unwrap(),
     )
+    .await
+}
+
+async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
+    install_code(InstallCodeArgument {
+        mode: CanisterInstallMode::Reinstall,
+        canister_id,
+        wasm_module,
+        arg,
+    })
     .await
 }
 
@@ -232,17 +190,81 @@ async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
     Ok(canister_id)
 }
 
-#[update]
-fn set_registry(id: Principal) {
-    REGISTRY.with(|registry| {
-        *registry.borrow_mut() = id;
-    });
-}
-
 async fn register(principal: Principal, vault: Principal) {
-    let reg = registry();
+    let reg = get_registry();
     let _: CallResult<()> =
         ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
+}
+
+#[update]
+#[candid_method(update)]
+async fn upgrade_proxies() {
+    let caller_proxy = ic_cdk::caller();
+    let registry = get_registry();
+    let component_canister = get_target_of_proxy(caller_proxy.clone())
+        .await
+        .expect("Failed to call 'target' to Proxy")
+        .0;
+
+    // check if caller is a registered proxy
+    let res = get_registered_canister_in_db(registry, component_canister).await.expect("Failed to call 'getRegisteredCanister' to Registry");
+    assert!(res.0.is_some(), "Caller is not a registered proxy");
+
+    // get targets to upgrade
+    let RegisteredCanisterInRegistry { principal: _, vault } = res.0.unwrap();
+    let db = get_db_from_proxy(caller_proxy.clone()).await.expect("Failed to call 'db' to Proxy").0;
+
+    // install_code with upgrade mode
+    let _ = install_for_upgrade(db, DB_WASM.to_vec(), vec![]).await.expect("Failed to upgrade DB for proxy");
+    let _ = install_for_upgrade(vault, VAULT_WASM.to_vec(), vec![]).await.expect("Failed to upgrade Vault for proxy");
+    let _ = install_for_upgrade(caller_proxy, PROXY_WASM.to_vec(), vec![]).await.expect("Failed to upgrade Proxy for proxy");
+}
+
+async fn install_for_upgrade(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
+    install_code(InstallCodeArgument {
+        mode: CanisterInstallMode::Upgrade,
+        canister_id,
+        wasm_module,
+        arg,
+    })
+    .await
+}
+
+async fn get_target_of_proxy(proxy: Principal) -> CallResult<(Principal,)> {
+    let out: CallResult<(Principal,)> = ic_cdk::api::call::call(proxy, "target", ()).await;
+    out
+}
+
+async fn get_db_from_proxy(proxy: Principal) -> CallResult<(Principal,)> {
+    let out: CallResult<(Principal,)> = ic_cdk::api::call::call(proxy, "db", ()).await;
+    out
+}
+
+async fn get_registered_canister_in_db(db: Principal, target: Principal) -> CallResult<(Option<RegisteredCanisterInRegistry>,)> {
+    let out: CallResult<(Option<RegisteredCanisterInRegistry>,)> = ic_cdk::api::call::call(db, "getRegisteredCanister", (target,)).await;
+    out
+}
+
+#[pre_upgrade]
+fn pre_upgrade() {
+    ic_cdk::println!("start: pre_upgrade");
+
+    let state = UpgradeStableState {
+        registry: get_registry(),
+    };
+    storage::stable_save((state,)).expect("Failed to save stable state");
+
+    ic_cdk::println!("finish: pre_upgrade");
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    ic_cdk::println!("start: post_upgrade");
+
+    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
+    set_registry(state.registry);
+
+    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

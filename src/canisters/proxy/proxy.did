@@ -1,5 +1,8 @@
-type CallLog = record { at : int; interactTo : Canister; canister : Canister };
-type Canister = record { "principal" : principal };
+type CallLog = record {
+  at : int;
+  interactTo : principal;
+  canister : principal;
+};
 type Error = record { message : text };
 type ExecutionResult = record {
   is_succeeded : bool;
@@ -27,12 +30,14 @@ type Result = variant {
 service : {
   db : () -> (principal) query;
   get_indexing_config : () -> (IndexingConfig) query;
+  initializer : () -> (principal) query;
   last_execution_result : () -> (ExecutionResult) query;
   last_succeeded : () -> (nat64) query;
-  list_logs : (int, int) -> (vec CallLog);
+  list_logs : (principal, int, int) -> (vec CallLog);
   next_schedule : () -> (nat64) query;
   proxy_call : (text, vec nat8) -> (Result);
   registry : () -> (principal) query;
+  request_upgrades_to_registry : () -> ();
   set_registry : (principal) -> ();
   start_indexing : (nat32, nat32, text, vec nat8) -> ();
   target : () -> (principal) query;

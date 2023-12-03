@@ -1,8 +1,8 @@
 [workspace]
 members = [
     "src/canisters/proxy",
-    "src/canisters/call_source",
-    "src/canisters/call_dest",
+    # "src/canisters/call_source",
+    # "src/canisters/call_dest",
     "src/canisters/vault",
     "src/canisters/initializer",
 ]

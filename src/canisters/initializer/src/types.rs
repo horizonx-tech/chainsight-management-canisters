@@ -39,6 +39,19 @@ pub struct RefuelTarget {
     pub threshold: u128,
 }
 
+#[derive(Clone, Debug, candid::CandidType, candid::Deserialize, serde::Serialize)]
+pub struct ComponentInfoFromProxy {
+    pub target: Principal,
+    pub vault: Principal,
+    pub db: Principal,
+}
+
+#[derive(CandidType, serde::Deserialize, Clone, Copy, PartialEq, Eq, Debug)]
+pub struct RegisteredCanisterInRegistry {
+    pub principal: Principal,
+    pub vault: Principal,
+}
+
 #[derive(CandidType, serde::Deserialize)]
 pub struct UpgradeStableState {
     pub registry: Principal,

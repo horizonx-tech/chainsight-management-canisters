@@ -9,10 +9,12 @@ edition = "2021"
 crate-type = ["cdylib"]
 
 [dependencies]
-candid = "0.8"
-ic-cdk = "0.7"
-ic-cdk-timers = "0.1" # Feel free to remove this dependency if you don't need timers
-ic-stable-structures = "0.5.4"
+candid.workspace = true
+ic-cdk.workspace = true
+ic-cdk-timers.workspace = true
+ic-stable-structures.workspace = true
+serde.workspace = true
+
 rpc = { path = "../rpc" }
-serde = "1.0.164"
 futures = "0.3.29"
+ciborium = "0.2.1"

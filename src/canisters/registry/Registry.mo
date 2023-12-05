@@ -16,8 +16,6 @@ import Array "mo:base/Array";
 import Log "log/Log";
 import LogRepository "log/LogRepository";
 import Time "mo:base/Time";
-import ConfigRepository "configs/ConfigRepository";
-import Config "configs/Config";
 import Buffer "mo:stable-buffer/StableBuffer";
 
 shared ({ caller = owner }) actor class RegistryCanister() = this {
@@ -35,10 +33,6 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         put : Log.CallLog -> async ();
         list : (canister : Principal, from : Time.Time, to : ?Time.Time) -> async ([Log.CallLog]);
     };
-    type ConfigRepositoryIFace = {
-        put : (config : Config.Config) -> async ();
-        get : (id : Text) -> async (?Config.Config);
-    };
 
     func listLogRepositories() : [LogRepositoryIFace] {
         Array.map<Text, LogRepositoryIFace>(
@@ -51,10 +45,6 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
 
     func logRepository(canisterId : Text) : LogRepositoryIFace {
         return LogRepository.Repository(db(canisterId));
-    };
-
-    func configRepository(canisterId : Text) : ConfigRepositoryIFace {
-        return ConfigRepository.Repository(db(canisterId));
     };
 
     func canisterRepository(canisterId : Text) : CanisterRepositoryIFace {
@@ -70,15 +60,6 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
             getCanisterIdsIfExists("Canisters"),
             func(canisterId) {
                 canisterRepository(canisterId);
-            },
-        );
-    };
-
-    func listConfigRepositories() : [ConfigRepositoryIFace] {
-        Array.map<Text, ConfigRepositoryIFace>(
-            getCanisterIdsIfExists("Configs"),
-            func(canisterId) {
-                configRepository(canisterId);
             },
         );
     };
@@ -112,35 +93,17 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
     };
 
     public shared func exists(principal : Principal) : async Bool {
+        switch (await getRegisteredCanister(principal)) {
+            case (null) { return false };
+            case (?canister) { return true };
+        };
+    };
+
+    public shared func getRegisteredCanister(principal : Principal) : async ?Canister.Canister {
         for (repo in listCanisterRepositories().vals()) {
-            if ((await repo.get(principal)) != null) {
-                return true;
-            };
+            return await repo.get(principal);
         };
-        return false;
-    };
-
-    public shared (msg) func registerProxy(proxy : Principal) {
-        assert (owner == msg.caller);
-        switch (putDestination("Configs")) {
-            case null {
-                Debug.trap("No config registry found");
-            };
-            case (?dest) {
-                await configRepository(dest).put(Config.newProxy(proxy));
-            };
-        };
-    };
-
-    public shared func getProxy() : async Principal {
-        for (repo in listConfigRepositories().vals()) {
-            let config = await repo.get("proxy");
-            switch (config) {
-                case (null) {};
-                case (?config) { return Principal.fromText(config.value) };
-            };
-        };
-        return Principal.fromText("");
+        return null;
     };
 
     public shared func scanCanisters() : async [Canister.Canister] {
@@ -160,8 +123,6 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         ([
             await createServiceCanister("Canisters"),
             await createServiceCanister("Logs"),
-            await createServiceCanister("Vaults"),
-            await createServiceCanister("Configs"),
         ]);
     };
 

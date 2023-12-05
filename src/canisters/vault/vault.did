@@ -1,7 +1,14 @@
 type ComponentMetricsSnapshot = record { cycles : nat; timestamp : nat64 };
 type CycleBalance = record { id : principal; amount : nat };
 type RefuelTarget = record { id : principal; threshold : nat; amount : nat };
-service : {
+service : (
+  principal,
+  principal,
+  nat,
+  nat64,
+  vec RefuelTarget,
+  vec record { principal; nat },
+) -> {
   balance_of : (principal) -> (nat) query;
   get_cumulative_refueled : (principal) -> (nat) query;
   get_cumulative_refueled_all : () -> (vec record { principal; nat }) query;
@@ -13,7 +20,7 @@ service : {
   put_refuel_target : (RefuelTarget) -> ();
   receive_revenue : () -> ();
   refuel : () -> ();
-  set_canister : (principal) -> (bool);
+  set_canister : (principal) -> ();
   share_of : (principal) -> (nat) query;
   supply : (opt principal) -> ();
   target_canister : () -> (principal) query;

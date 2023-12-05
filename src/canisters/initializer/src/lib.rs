@@ -182,10 +182,13 @@ async fn after_install(canister_id: &Principal, controllers: &Vec<Principal>) ->
 }
 
 async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
-    let canister_id = create_canister(CreateCanisterArgument { settings: None })
-        .await?
-        .0
-        .canister_id;
+    let canister_id = create_canister(
+        CreateCanisterArgument { settings: None },
+        100_000_000_000u128 // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+    )
+    .await?
+    .0
+    .canister_id;
     deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
     Ok(canister_id)
 }

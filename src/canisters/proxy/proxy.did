@@ -32,7 +32,7 @@ type Result = variant {
   Ok : record { vec nat8 };
   Err : record { RejectionCode; text };
 };
-service : {
+service : (principal, principal, principal, principal) -> {
   db : () -> (principal) query;
   get_component_info : () -> (ComponentInfo) query;
   get_indexing_config : () -> (IndexingConfig) query;

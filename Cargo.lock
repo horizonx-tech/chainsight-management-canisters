@@ -70,6 +70,32 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "14c189c53d098945499cdfa7ecc63567cf3886b3332b312a5b4585d8d3a6a610"
 
 [[package]]
+name = "call_dest"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "common",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "ic-stable-structures",
+ "rpc",
+ "serde",
+]
+
+[[package]]
+name = "call_source"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "common",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "ic-stable-structures",
+ "rpc",
+ "serde",
+]
+
+[[package]]
 name = "candid"
 version = "0.9.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -158,6 +184,17 @@ checksum = "3538270d33cc669650c4b093848450d380def10c331d38c768e34cac80576e6e"
 dependencies = [
  "termcolor",
  "unicode-width",
+]
+
+[[package]]
+name = "common"
+version = "0.1.0"
+dependencies = [
+ "candid",
+ "ic-cdk",
+ "ic-cdk-timers",
+ "serde",
+ "serde_json",
 ]
 
 [[package]]

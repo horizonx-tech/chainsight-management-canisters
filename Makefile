@@ -36,5 +36,9 @@ local:
 	make generate-did create-build install
 	dfx canister deposit-cycles 30000000000000 _management_canister_initializer --network http://localhost:$(port)
 
+upgrade:
+	make build build-initializer
+	dfx canister install _management_canister_initializer --mode=upgrade --network http://localhost:${port}
+
 generate-did:
 	cargo test generate_candid

@@ -54,35 +54,37 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         .await
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
+    update_controllers_for_canister(&principal, controllers).await.unwrap();
+    update_controllers_for_canister(&vault, controllers).await.unwrap();
 
-    after_install(&principal, controllers).await.unwrap();
-
-    let db = create_new_canister(cycles.db.initial_supply).await.unwrap();
-    install_db(db).await.unwrap();
-    after_install(&db, controllers).await.unwrap();
+    let db = create_new_canister(cycles.db.initial_supply).await.unwrap_or_else(|_| panic!("{}", format!("Failed to deploy db. deployed canisters: vault = {:?}", vault.to_text())));
+    let err_msg = format!("Failed to initialize db. deployed canisters: vault = {:?}, db = {:?}", vault.to_text(), db.to_text());
+    update_controllers_for_canister(&db, controllers).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+    install_db(db).await.unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "DB of {:?} installed at {:?}",
         principal.to_string(),
         db.to_string()
     );
-    init_db(db).await.unwrap();
+    init_db(db).await.unwrap_or_else(|_| panic!("{}", &err_msg));
 
     let proxy = create_new_canister(cycles.proxy.initial_supply)
         .await
-        .unwrap();
-    install_proxy(proxy, principal, db, vault).await.unwrap();
-    after_install(&proxy, controllers).await.unwrap();
+        .unwrap_or_else(|_| panic!("{}", &format!("Failed to deploy proxy. deployed canisters: vault = {:?}, db = {:?}", vault.to_text(), db.to_text())));
+    let err_msg = format!("Failed to initialize proxy. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}", vault.to_text(), db.to_text(), proxy.to_text());
+    update_controllers_for_canister(&proxy, controllers).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+    install_proxy(proxy, principal, db, vault).await.unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
         principal.to_string(),
         proxy.to_string()
     );
 
+    let err_msg = format!("Failed to initialize vault. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}", vault.to_text(), db.to_text(), proxy.to_text());
     install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
         .await
-        .unwrap();
-    after_install(&vault, controllers).await.unwrap();
-    register(principal, vault).await;
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
+    register_canister_of_registry(principal, vault).await.unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
         principal.to_string(),
@@ -168,7 +170,7 @@ async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) ->
     .await
 }
 
-async fn after_install(canister_id: &Principal, controllers: &Vec<Principal>) -> CallResult<()> {
+async fn update_controllers_for_canister(canister_id: &Principal, controllers: &Vec<Principal>) -> CallResult<()> {
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id.clone(),
         settings: CanisterSettings {
@@ -193,10 +195,9 @@ async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
     Ok(canister_id)
 }
 
-async fn register(principal: Principal, vault: Principal) {
+async fn register_canister_of_registry(principal: Principal, vault: Principal) -> CallResult<()> {
     let reg = get_registry();
-    let _: CallResult<()> =
-        ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await;
+    ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await
 }
 
 #[update]

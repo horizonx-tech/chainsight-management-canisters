@@ -53,13 +53,16 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     let vault = create_new_canister(cycles.vault_intial_supply)
         .await
         .unwrap();
+    ic_cdk::println!("vault: {:?}", vault.to_text());
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
 
-    after_install(&principal, controllers).await.unwrap();
+    update_controllers_for_canister(&principal, controllers).await.unwrap();
+    update_controllers_for_canister(&vault, controllers).await.unwrap();
 
     let db = create_new_canister(cycles.db.initial_supply).await.unwrap();
+    ic_cdk::println!("db: {:?}", db.to_text());
+    update_controllers_for_canister(&db, controllers).await.unwrap();
     install_db(db).await.unwrap();
-    after_install(&db, controllers).await.unwrap();
     ic_cdk::println!(
         "DB of {:?} installed at {:?}",
         principal.to_string(),
@@ -70,8 +73,9 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     let proxy = create_new_canister(cycles.proxy.initial_supply)
         .await
         .unwrap();
+    ic_cdk::println!("proxy: {:?}", proxy.to_text());
+    update_controllers_for_canister(&proxy, controllers).await.unwrap();
     install_proxy(proxy, principal, db, vault).await.unwrap();
-    after_install(&proxy, controllers).await.unwrap();
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
         principal.to_string(),
@@ -81,7 +85,6 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
         .await
         .unwrap();
-    after_install(&vault, controllers).await.unwrap();
     register(principal, vault).await;
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
@@ -168,7 +171,7 @@ async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) ->
     .await
 }
 
-async fn after_install(canister_id: &Principal, controllers: &Vec<Principal>) -> CallResult<()> {
+async fn update_controllers_for_canister(canister_id: &Principal, controllers: &Vec<Principal>) -> CallResult<()> {
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id.clone(),
         settings: CanisterSettings {

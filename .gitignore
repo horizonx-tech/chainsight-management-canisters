@@ -32,3 +32,5 @@ local/
 # customize
 /artifacts/*
 !/artifacts/*.wasm.gz
+!/artifacts/*.did
+!/artifacts/dfx.json

@@ -1,0 +1,38 @@
+{
+  "version": 1,
+  "canisters": {
+    "_management_canister_registry": {
+      "gzip": true,
+      "type": "custom",
+      "candid": "./registry.did",
+      "wasm": "./registry.wasm.gz",
+      "metadata": [
+        {
+          "name": "candid:service",
+          "visibility": "public"
+        }
+      ]
+    },
+    "_management_canister_initializer": {
+      "gzip": true,
+      "type": "custom",
+      "candid": "../src/canisters/initializer/initializer.did",
+      "wasm": "./initializer.wasm.gz",
+      "metadata": [
+        {
+          "name": "candid:service",
+          "visibility": "public"
+        }
+      ]
+    }
+  },
+  "declarations": {
+    "output": "src/canisters/declarations"
+  },
+  "defaults": {
+    "build": {
+      "packtool": "",
+      "args": ""
+    }
+  }
+}

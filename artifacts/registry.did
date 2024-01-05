@@ -1,0 +1,19 @@
+type CallLog = record {
+  at : Time;
+  interactTo : principal;
+  canister : principal;
+};
+type Canister = record { "principal" : principal; vault : principal };
+type RegistryCanister = service {
+  autoScaleServiceCanister : (text) -> (text);
+  exists : (principal) -> (bool);
+  getCanistersByPK : (text) -> (vec text) query;
+  getRegisteredCanister : (principal) -> (opt Canister);
+  init : () -> (vec opt text);
+  listLogsOf : (principal, Time, Time) -> (vec CallLog);
+  putLog : (principal, principal) -> ();
+  registerCanister : (principal, principal) -> ();
+  scanCanisters : () -> (vec Canister);
+};
+type Time = int;
+service : RegistryCanister

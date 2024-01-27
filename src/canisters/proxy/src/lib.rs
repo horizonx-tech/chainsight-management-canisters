@@ -3,7 +3,7 @@ use std::{borrow::Cow, cell::RefCell};
 use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
-    query, update, storage, pre_upgrade, post_upgrade,
+    query, update,
 };
 use ic_stable_structures::{memory_manager::{MemoryId, MemoryManager, VirtualMemory}, DefaultMemoryImpl};
 use serde::{Deserialize, Serialize};
@@ -59,18 +59,6 @@ pub struct ComponentInfo {
     pub target: Principal,
     pub vault: Principal,
     pub db: Principal,
-}
-
-#[derive(candid::CandidType, candid::Deserialize)]
-pub struct UpgradeStableState {
-    pub target: Principal,
-    pub vault: Principal,
-    pub db: Principal,
-    pub initializer: Principal,
-    pub registry: Principal,
-    pub indexing_config: IndexingConfig,
-    pub last_succeeded: u64,
-    pub last_execution_result: ExecutionResult,
 }
 
 thread_local! {
@@ -422,44 +410,6 @@ async fn request_upgrades_to_registry() {
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");
-}
-
-#[pre_upgrade]
-fn pre_upgrade() {
-    ic_cdk::println!("start: pre_upgrade");
-
-    let state = UpgradeStableState {
-        target: _target(),
-        db: _db(),
-        vault: _vault(),
-        initializer: _initializer(),
-        registry: _registry(),
-        indexing_config: get_indexing_config(),
-        last_succeeded: last_succeeded(),
-        last_execution_result: last_execution_result(),
-    };
-    storage::stable_save((state,)).expect("Failed to save stable state");
-
-    ic_cdk::println!("finish: pre_upgrade");
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    ic_cdk::println!("start: post_upgrade");
-
-    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
-    _set_target(state.target);
-    _set_db(state.db);
-    _set_vault(state.vault);
-    _set_initializer(state.initializer);
-    set_registry(state.registry);
-    set_last_succeeded(state.last_succeeded);
-    set_last_execution_result(state.last_execution_result);
-
-    // reschedule & set indexing_config, next_schedule
-    start_indexing_internal(state.indexing_config, 0); // temp: delay_secs
-
-    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

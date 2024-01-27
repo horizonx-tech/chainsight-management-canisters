@@ -122,8 +122,8 @@ fn total_supply() -> Balance {
 }
 
 fn set_total_supply(value: Balance) {
-    let _ = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(value));
-    // todo: handle result
+    let res = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(value));
+    res.unwrap(); // todo: use result
 }
 
 #[query]
@@ -133,8 +133,8 @@ fn index() -> Index {
 }
 
 fn set_index(value: Index) {
-    let _ = INDEX.with(|m| m.borrow_mut().set(value));
-    // todo: handle result
+    let res = INDEX.with(|m| m.borrow_mut().set(value));
+    res.unwrap(); // todo: use result
 }
 
 
@@ -211,8 +211,8 @@ fn add_share(principal: Principal, delta: &Balance, neg: bool) {
 fn salvage_stray_cycles() {
     let actual_balance: Balance = canister_balance128().into();
     if actual_balance > total_supply() {
-        let _ = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(actual_balance));
-        // todo: handle result
+        let res = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(actual_balance));
+        res.unwrap(); // todo: use result
     }
 }
 
@@ -344,8 +344,8 @@ fn set_canister(principal: Principal) {
 }
 
 fn _set_target_canister(principal: Principal) {
-    let _ = TARGET_CANISTER_ID.with(|m| m.borrow_mut().set(principal.to_text()));
-    // todo: handle result
+    let res = TARGET_CANISTER_ID.with(|m| m.borrow_mut().set(principal.to_text()));
+    res.unwrap(); // todo: use result
 }
 
 fn start_refueling(interval_secs: u64) {

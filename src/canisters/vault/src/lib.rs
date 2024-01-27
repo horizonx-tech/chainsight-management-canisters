@@ -47,11 +47,24 @@ thread_local! {
     static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<ic_stable_structures::Vec<ComponentMetricsSnapshot, MemoryType>> = RefCell::new(
         ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
     );
-
-    // heap memory
-    static TARGET_CANISTER_ID : RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static TOTAL_SUPPLY: RefCell<Balance> = RefCell::new(Balance::default());
-    static INDEX: RefCell<Index> = RefCell::new(Index::default());
+    static TARGET_CANISTER_ID: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
+            String::new(),
+         ).unwrap()
+    );
+    static TOTAL_SUPPLY: RefCell<ic_stable_structures::StableCell<Balance, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6))),
+            Balance::default(),
+         ).unwrap()
+    );
+    static INDEX: RefCell<ic_stable_structures::StableCell<Index, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+            Index::default(),
+         ).unwrap()
+    );
 }
 
 #[ic_cdk::init]
@@ -105,21 +118,23 @@ async fn withdraw(delta: Balance) {
 #[query]
 #[candid_method(query)]
 fn total_supply() -> Balance {
-    TOTAL_SUPPLY.with(|m| m.borrow().clone())
+    TOTAL_SUPPLY.with(|m| m.borrow().get().clone())
 }
 
 fn set_total_supply(value: Balance) {
-    TOTAL_SUPPLY.with(|m| *m.borrow_mut() = value)
+    let _ = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(value));
+    // todo: handle result
 }
 
 #[query]
 #[candid_method(query)]
 fn index() -> Index {
-    INDEX.with(|m| m.borrow().clone())
+    INDEX.with(|m| m.borrow().get().clone())
 }
 
 fn set_index(value: Index) {
-    INDEX.with(|m| *m.borrow_mut() = value)
+    let _ = INDEX.with(|m| m.borrow_mut().set(value));
+    // todo: handle result
 }
 
 
@@ -196,7 +211,8 @@ fn add_share(principal: Principal, delta: &Balance, neg: bool) {
 fn salvage_stray_cycles() {
     let actual_balance: Balance = canister_balance128().into();
     if actual_balance > total_supply() {
-        TOTAL_SUPPLY.with(|m| *m.borrow_mut() = actual_balance)
+        let _ = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(actual_balance));
+        // todo: handle result
     }
 }
 
@@ -317,7 +333,8 @@ async fn get_cycle_balances() -> Vec<CycleBalance> {
 #[query]
 #[candid_method(query)]
 fn target_canister() -> Principal {
-    TARGET_CANISTER_ID.with(|c| c.borrow().clone())
+    let res = TARGET_CANISTER_ID.with(|c| c.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 
 #[update]
@@ -327,7 +344,8 @@ fn set_canister(principal: Principal) {
 }
 
 fn _set_target_canister(principal: Principal) {
-    TARGET_CANISTER_ID.with(|m| *m.borrow_mut() = principal)
+    let _ = TARGET_CANISTER_ID.with(|m| m.borrow_mut().set(principal.to_text()));
+    // todo: handle result
 }
 
 fn start_refueling(interval_secs: u64) {

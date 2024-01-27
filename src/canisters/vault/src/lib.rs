@@ -8,15 +8,15 @@ use ic_cdk::{
             provisional::CanisterIdRecord,
         },
     },
-    caller, query, update, pre_upgrade, post_upgrade,
+    caller, query, update,
 };
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
-    DefaultMemoryImpl, StableBTreeMap, writer::Writer, Memory,
+    DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, time::Duration};
 use types::{
-    Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget, UpgradeStableState,
+    Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget,
 };
 mod types;
 
@@ -24,7 +24,8 @@ type MemoryType = VirtualMemory<DefaultMemoryImpl>;
 
 const MONITROING_INTERVAL_SECS: u64 = 3600;
 
-const MEMORY_ID_FOR_UPGRADE: MemoryId = MemoryId::new(0);
+// NOTE: All storage uses stable memory, so no memory for upgrades is needed.
+// const MEMORY_ID_FOR_UPGRADE: MemoryId = MemoryId::new(0);
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
@@ -434,54 +435,6 @@ fn record_cumulative_refueled(target: Principal, amount: u128) {
         let after = balance + amount;
         m.borrow_mut().insert(target.into(), after);
     })
-}
-
-fn get_upgrades_memory() -> MemoryType {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FOR_UPGRADE))
-}
-
-#[pre_upgrade]
-fn pre_upgrade() {
-    ic_cdk::println!("start: pre_upgrade");
-
-    let state = UpgradeStableState {
-        target_canister_id: target_canister(),
-        total_supply: total_supply(),
-        index: index(),
-    };
-    let state_bytes = state.to_cbor();
-
-    let len = state_bytes.len() as u32;
-    let mut memory = get_upgrades_memory();
-    let mut writer = Writer::new(&mut memory, 0);
-    writer.write(&len.to_le_bytes()).unwrap();
-    writer.write(&state_bytes).unwrap();
-
-    ic_cdk::println!("finish: pre_upgrade");
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    ic_cdk::println!("start: post_upgrade");
-
-    let memory = get_upgrades_memory();
-
-    // Read the length of the state bytes.
-    let mut state_len_bytes = [0; 4];
-    memory.read(0, &mut state_len_bytes);
-    let state_len = u32::from_le_bytes(state_len_bytes) as usize;
-
-    // Read the bytes
-    let mut state_bytes = vec![0; state_len];
-    memory.read(4, &mut state_bytes);
-
-    // Restore
-    let state = UpgradeStableState::from_cbor(&state_bytes);
-    _set_target_canister(state.target_canister_id);
-    set_total_supply(state.total_supply);
-    set_index(state.index);
-
-    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

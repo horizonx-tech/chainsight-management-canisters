@@ -8,15 +8,15 @@ use ic_cdk::{
             provisional::CanisterIdRecord,
         },
     },
-    caller, query, update, pre_upgrade, post_upgrade,
+    caller, query, update,
 };
 use ic_stable_structures::{
     memory_manager::{MemoryId, MemoryManager, VirtualMemory},
-    DefaultMemoryImpl, StableBTreeMap, writer::Writer, Memory,
+    DefaultMemoryImpl, StableBTreeMap,
 };
 use std::{cell::RefCell, time::Duration};
 use types::{
-    Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget, UpgradeStableState,
+    Balance, ComponentMetricsSnapshot, CycleBalance, Index, PrincipalStorable, RefuelTarget,
 };
 mod types;
 
@@ -24,7 +24,8 @@ type MemoryType = VirtualMemory<DefaultMemoryImpl>;
 
 const MONITROING_INTERVAL_SECS: u64 = 3600;
 
-const MEMORY_ID_FOR_UPGRADE: MemoryId = MemoryId::new(0);
+// NOTE: All storage uses stable memory, so no memory for upgrades is needed.
+// const MEMORY_ID_FOR_UPGRADE: MemoryId = MemoryId::new(0);
 
 thread_local! {
     static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
@@ -47,11 +48,24 @@ thread_local! {
     static COMPONENT_METRICS_SNAPSHOT: std::cell::RefCell<ic_stable_structures::Vec<ComponentMetricsSnapshot, MemoryType>> = RefCell::new(
         ic_stable_structures::Vec::init(MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4)))).unwrap()
     );
-
-    // heap memory
-    static TARGET_CANISTER_ID : RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static TOTAL_SUPPLY: RefCell<Balance> = RefCell::new(Balance::default());
-    static INDEX: RefCell<Index> = RefCell::new(Index::default());
+    static TARGET_CANISTER_ID: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
+            String::new(),
+         ).unwrap()
+    );
+    static TOTAL_SUPPLY: RefCell<ic_stable_structures::StableCell<Balance, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6))),
+            Balance::default(),
+         ).unwrap()
+    );
+    static INDEX: RefCell<ic_stable_structures::StableCell<Index, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+            Index::default(),
+         ).unwrap()
+    );
 }
 
 #[ic_cdk::init]
@@ -105,21 +119,23 @@ async fn withdraw(delta: Balance) {
 #[query]
 #[candid_method(query)]
 fn total_supply() -> Balance {
-    TOTAL_SUPPLY.with(|m| m.borrow().clone())
+    TOTAL_SUPPLY.with(|m| m.borrow().get().clone())
 }
 
 fn set_total_supply(value: Balance) {
-    TOTAL_SUPPLY.with(|m| *m.borrow_mut() = value)
+    let res = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(value));
+    res.unwrap(); // todo: use result
 }
 
 #[query]
 #[candid_method(query)]
 fn index() -> Index {
-    INDEX.with(|m| m.borrow().clone())
+    INDEX.with(|m| m.borrow().get().clone())
 }
 
 fn set_index(value: Index) {
-    INDEX.with(|m| *m.borrow_mut() = value)
+    let res = INDEX.with(|m| m.borrow_mut().set(value));
+    res.unwrap(); // todo: use result
 }
 
 
@@ -196,7 +212,8 @@ fn add_share(principal: Principal, delta: &Balance, neg: bool) {
 fn salvage_stray_cycles() {
     let actual_balance: Balance = canister_balance128().into();
     if actual_balance > total_supply() {
-        TOTAL_SUPPLY.with(|m| *m.borrow_mut() = actual_balance)
+        let res = TOTAL_SUPPLY.with(|m| m.borrow_mut().set(actual_balance));
+        res.unwrap(); // todo: use result
     }
 }
 
@@ -317,7 +334,8 @@ async fn get_cycle_balances() -> Vec<CycleBalance> {
 #[query]
 #[candid_method(query)]
 fn target_canister() -> Principal {
-    TARGET_CANISTER_ID.with(|c| c.borrow().clone())
+    let res = TARGET_CANISTER_ID.with(|c| c.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 
 #[update]
@@ -327,7 +345,8 @@ fn set_canister(principal: Principal) {
 }
 
 fn _set_target_canister(principal: Principal) {
-    TARGET_CANISTER_ID.with(|m| *m.borrow_mut() = principal)
+    let res = TARGET_CANISTER_ID.with(|m| m.borrow_mut().set(principal.to_text()));
+    res.unwrap(); // todo: use result
 }
 
 fn start_refueling(interval_secs: u64) {
@@ -416,54 +435,6 @@ fn record_cumulative_refueled(target: Principal, amount: u128) {
         let after = balance + amount;
         m.borrow_mut().insert(target.into(), after);
     })
-}
-
-fn get_upgrades_memory() -> MemoryType {
-    MEMORY_MANAGER.with(|m| m.borrow().get(MEMORY_ID_FOR_UPGRADE))
-}
-
-#[pre_upgrade]
-fn pre_upgrade() {
-    ic_cdk::println!("start: pre_upgrade");
-
-    let state = UpgradeStableState {
-        target_canister_id: target_canister(),
-        total_supply: total_supply(),
-        index: index(),
-    };
-    let state_bytes = state.to_cbor();
-
-    let len = state_bytes.len() as u32;
-    let mut memory = get_upgrades_memory();
-    let mut writer = Writer::new(&mut memory, 0);
-    writer.write(&len.to_le_bytes()).unwrap();
-    writer.write(&state_bytes).unwrap();
-
-    ic_cdk::println!("finish: pre_upgrade");
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    ic_cdk::println!("start: post_upgrade");
-
-    let memory = get_upgrades_memory();
-
-    // Read the length of the state bytes.
-    let mut state_len_bytes = [0; 4];
-    memory.read(0, &mut state_len_bytes);
-    let state_len = u32::from_le_bytes(state_len_bytes) as usize;
-
-    // Read the bytes
-    let mut state_bytes = vec![0; state_len];
-    memory.read(4, &mut state_bytes);
-
-    // Restore
-    let state = UpgradeStableState::from_cbor(&state_bytes);
-    _set_target_canister(state.target_canister_id);
-    set_total_supply(state.total_supply);
-    set_index(state.index);
-
-    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

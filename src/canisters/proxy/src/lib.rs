@@ -1,11 +1,14 @@
-use std::cell::RefCell;
+use std::{borrow::Cow, cell::RefCell};
 
-use candid::{candid_method, CandidType, Int, Principal};
+use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode},
-    query, update, storage, pre_upgrade, post_upgrade,
+    query, update,
 };
+use ic_stable_structures::{memory_manager::{MemoryId, MemoryManager, VirtualMemory}, DefaultMemoryImpl};
 use serde::{Deserialize, Serialize};
+
+type MemoryType = VirtualMemory<DefaultMemoryImpl>;
 
 #[derive(CandidType, Clone, Serialize, Deserialize, PartialEq, Eq, PartialOrd, Ord, Hash)]
 struct CallLog {
@@ -21,12 +24,28 @@ pub struct IndexingConfig {
     pub method: String,
     pub args: Vec<u8>,
 }
+impl ic_stable_structures::Storable for IndexingConfig {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
+}
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
 pub struct ExecutionResult {
     pub is_succeeded: bool,
     pub timestamp: u64,
     pub error: Option<Error>,
+}
+impl ic_stable_structures::Storable for ExecutionResult {
+    fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
+        Decode!(bytes.as_ref(), Self).unwrap()
+    }
+    fn to_bytes(&self) -> std::borrow::Cow<[u8]> {
+        Cow::Owned(Encode!(self).unwrap())
+    }
 }
 
 #[derive(Clone, Debug, Default, candid::CandidType, candid::Deserialize, serde::Serialize)]
@@ -42,32 +61,69 @@ pub struct ComponentInfo {
     pub db: Principal,
 }
 
-#[derive(candid::CandidType, candid::Deserialize)]
-pub struct UpgradeStableState {
-    pub target: Principal,
-    pub vault: Principal,
-    pub db: Principal,
-    pub initializer: Principal,
-    pub registry: Principal,
-    pub indexing_config: IndexingConfig,
-    pub last_succeeded: u64,
-    pub last_execution_result: ExecutionResult,
-}
-
 thread_local! {
+    static MEMORY_MANAGER: RefCell<MemoryManager<DefaultMemoryImpl>> =
+        RefCell::new(MemoryManager::init(DefaultMemoryImpl::default()));
+
     // sidecar
-    static TARGET: RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static DB: RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static VAULT: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static TARGET: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(1))),
+            String::new(),
+        ).unwrap()
+    );
+    static DB: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(2))),
+            String::new(),
+        ).unwrap()
+    );
+    static VAULT: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(3))),
+            String::new(),
+        ).unwrap()
+    );
+
     // manager
-    static INITIALIZER: RefCell<Principal> = RefCell::new(Principal::anonymous());
-    static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
+    static INITIALIZER: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(4))),
+            String::new(),
+        ).unwrap()
+    );
+    static REGISTRY: RefCell<ic_stable_structures::StableCell<String, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(5))),
+            String::new(),
+        ).unwrap()
+    );
 
     // static KNOWN_CANISTERS: RefCell<Vec<Principal>> = RefCell::new(vec![]);
-    static INDEXING_CONFIG: std::cell::RefCell<IndexingConfig> = std::cell::RefCell::new(IndexingConfig::default());
-    static LAST_SUCCEEDED: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
-    static LAST_EXECUTION_RESULT: std::cell::RefCell<ExecutionResult> = std::cell::RefCell::new(ExecutionResult::default());
-    static NEXT_SCHEDULE: std::cell::RefCell<u64> = std::cell::RefCell::new(0);
+    static INDEXING_CONFIG: RefCell<ic_stable_structures::StableCell<IndexingConfig, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(6))),
+            IndexingConfig::default(),
+         ).unwrap()
+    );
+    static LAST_SUCCEEDED: RefCell<ic_stable_structures::StableCell<u64, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(7))),
+            0,
+         ).unwrap()
+    );
+    static LAST_EXECUTION_RESULT: RefCell<ic_stable_structures::StableCell<ExecutionResult, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(8))),
+            ExecutionResult::default(),
+         ).unwrap()
+    );
+    static NEXT_SCHEDULE: RefCell<ic_stable_structures::StableCell<u64, MemoryType>> = RefCell::new(
+        ic_stable_structures::StableCell::init(
+            MEMORY_MANAGER.with(|m| m.borrow().get(MemoryId::new(9))),
+            0,
+         ).unwrap()
+    );
 }
 
 #[query]
@@ -86,10 +142,13 @@ fn target() -> Principal {
     _target()
 }
 fn _target() -> Principal {
-    TARGET.with(|target| target.borrow().clone())
+    let res = TARGET.with(|target| target.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
+
 }
 fn _set_target(id: Principal) {
-    TARGET.with(|target| *target.borrow_mut() = id);
+    let res = TARGET.with(|target| target.borrow_mut().set(id.to_text()));
+    res.unwrap();
 }
 
 #[query]
@@ -98,10 +157,12 @@ fn db() -> Principal {
     _db()
 }
 fn _db() -> Principal {
-    DB.with(|db| db.borrow().clone())
+    let res = DB.with(|db| db.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 fn _set_db(id: Principal) {
-    DB.with(|db| *db.borrow_mut() = id);
+    let res = DB.with(|db| db.borrow_mut().set(id.to_text()));
+    res.unwrap();
 }
 
 #[query]
@@ -110,10 +171,12 @@ fn vault() -> Principal {
     _vault()
 }
 fn _vault() -> Principal {
-    VAULT.with(|db| db.borrow().clone())
+    let res = VAULT.with(|db| db.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 fn _set_vault(id: Principal) {
-    VAULT.with(|db| *db.borrow_mut() = id);
+    let res = VAULT.with(|db| db.borrow_mut().set(id.to_text()));
+    res.unwrap();
 }
 
 #[query]
@@ -122,7 +185,8 @@ fn registry() -> Principal {
     _registry()
 }
 fn _registry() -> Principal {
-    REGISTRY.with(|registry| registry.borrow().clone())
+    let res = REGISTRY.with(|registry| registry.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 
 #[query]
@@ -131,10 +195,12 @@ fn initializer() -> Principal {
     _initializer()
 }
 fn _initializer() -> Principal {
-    INITIALIZER.with(|db| db.borrow().clone())
+    let res = INITIALIZER.with(|db| db.borrow().get().clone());
+    Principal::from_text(&res).unwrap()
 }
 fn _set_initializer(id: Principal) {
-    INITIALIZER.with(|db| *db.borrow_mut() = id);
+    let res = INITIALIZER.with(|db| db.borrow_mut().set(id.to_text()));
+    res.unwrap();
 }
 
 #[ic_cdk::init]
@@ -222,47 +288,52 @@ async fn _put_call_log(caller: Principal) {
 #[update]
 #[candid_method(update)]
 fn set_registry(id: Principal) {
-    REGISTRY.with(|registry| *registry.borrow_mut() = id);
+    let res = REGISTRY.with(|registry| registry.borrow_mut().set(id.to_text()));
+    res.unwrap();
 }
 
 #[query]
 #[candid_method(query)]
 fn last_succeeded() -> u64 {
-    LAST_SUCCEEDED.with(|x| *x.borrow())
+    LAST_SUCCEEDED.with(|x| x.borrow().get().clone())
 }
 
 fn set_last_succeeded(v: u64) {
-    LAST_SUCCEEDED.with(|x| *x.borrow_mut() = v)
+    let res = LAST_SUCCEEDED.with(|x| x.borrow_mut().set(v));
+    res.unwrap();
 }
 
 #[query]
 #[candid_method(query)]
 fn last_execution_result() -> ExecutionResult {
-    LAST_EXECUTION_RESULT.with(|x| x.borrow().clone())
+    LAST_EXECUTION_RESULT.with(|x| x.borrow().get().clone())
 }
 
 fn set_last_execution_result(v: ExecutionResult) {
-    LAST_EXECUTION_RESULT.with(|x| *x.borrow_mut() = v)
+    let res = LAST_EXECUTION_RESULT.with(|x| x.borrow_mut().set(v));
+    res.unwrap();
 }
 
 #[query]
 #[candid_method(query)]
 fn next_schedule() -> u64 {
-    NEXT_SCHEDULE.with(|f| *f.borrow())
+    NEXT_SCHEDULE.with(|f| f.borrow().get().clone())
 }
 
 fn set_next_schedule(time: u64) {
-    NEXT_SCHEDULE.with(|f| *f.borrow_mut() = time);
+    let res = NEXT_SCHEDULE.with(|f| f.borrow_mut().set(time));
+    res.unwrap();
 }
 
 #[query]
 #[candid_method(query)]
 fn get_indexing_config() -> IndexingConfig {
-    INDEXING_CONFIG.with(|f| f.borrow().clone())
+    INDEXING_CONFIG.with(|f| f.borrow().get().clone())
 }
 
 fn set_indexing_config(config: IndexingConfig) {
-    INDEXING_CONFIG.with(|f| *f.borrow_mut() = config);
+    let res = INDEXING_CONFIG.with(|f| f.borrow_mut().set(config));
+    res.unwrap();
 }
 
 #[update]
@@ -339,44 +410,6 @@ async fn request_upgrades_to_registry() {
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");
-}
-
-#[pre_upgrade]
-fn pre_upgrade() {
-    ic_cdk::println!("start: pre_upgrade");
-
-    let state = UpgradeStableState {
-        target: _target(),
-        db: _db(),
-        vault: _vault(),
-        initializer: _initializer(),
-        registry: _registry(),
-        indexing_config: get_indexing_config(),
-        last_succeeded: last_succeeded(),
-        last_execution_result: last_execution_result(),
-    };
-    storage::stable_save((state,)).expect("Failed to save stable state");
-
-    ic_cdk::println!("finish: pre_upgrade");
-}
-
-#[post_upgrade]
-fn post_upgrade() {
-    ic_cdk::println!("start: post_upgrade");
-
-    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
-    _set_target(state.target);
-    _set_db(state.db);
-    _set_vault(state.vault);
-    _set_initializer(state.initializer);
-    set_registry(state.registry);
-    set_last_succeeded(state.last_succeeded);
-    set_last_execution_result(state.last_execution_result);
-
-    // reschedule & set indexing_config, next_schedule
-    start_indexing_internal(state.indexing_config, 0); // temp: delay_secs
-
-    ic_cdk::println!("finish: post_upgrade");
 }
 
 #[cfg(test)]

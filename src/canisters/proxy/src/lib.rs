@@ -365,8 +365,10 @@ fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32) {
                 ic_cdk::spawn(async move { index().await });
             },
         );
+        ic_cdk::spawn(async move { index().await }); // First execution after waiting for delay secs
     });
-    set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
+    let next_schedule = current_time_sec + delay;
+    set_next_schedule(next_schedule as u64);
 }
 
 async fn index() {

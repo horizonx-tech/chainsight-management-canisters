@@ -5,6 +5,7 @@ use ic_cdk::{
     api::call::{CallResult, RejectionCode},
     query, update,
 };
+use ic_cdk_timers::TimerId;
 use ic_stable_structures::{memory_manager::{MemoryId, MemoryManager, VirtualMemory}, DefaultMemoryImpl};
 use serde::{Deserialize, Serialize};
 
@@ -124,6 +125,8 @@ thread_local! {
             0,
          ).unwrap()
     );
+
+    static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(None);
 }
 
 #[query]
@@ -201,6 +204,13 @@ fn _initializer() -> Principal {
 fn _set_initializer(id: Principal) {
     let res = INITIALIZER.with(|db| db.borrow_mut().set(id.to_text()));
     res.unwrap();
+}
+
+fn _timer_id() -> Option<TimerId> {
+    TIMER_ID.with(|state| *state.borrow())
+}
+fn _set_timer_id(id: TimerId) {
+    TIMER_ID.with(|state: &RefCell<Option<TimerId>>| *state.borrow_mut() = Some(id));
 }
 
 #[ic_cdk::init]
@@ -358,15 +368,17 @@ fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32) {
         round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
             - current_time_sec;
     set_indexing_config(indexing_config);
-    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
-        ic_cdk_timers::set_timer_interval(
+    let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+        let timer_id = ic_cdk_timers::set_timer_interval(
             std::time::Duration::from_secs(task_interval_secs as u64),
             || {
                 ic_cdk::spawn(async move { index().await });
             },
         );
         ic_cdk::spawn(async move { index().await }); // First execution after waiting for delay secs
+        _set_timer_id(timer_id); // Save to overwrite TimerId by set_timer
     });
+    _set_timer_id(timer_id);
     let next_schedule = current_time_sec + delay;
     set_next_schedule(next_schedule as u64);
 }

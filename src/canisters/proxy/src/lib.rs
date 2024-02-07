@@ -2,8 +2,7 @@ use std::{borrow::Cow, cell::RefCell};
 
 use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
-    api::call::{CallResult, RejectionCode},
-    query, update,
+    api::call::{CallResult, RejectionCode}, post_upgrade, query, update
 };
 use ic_cdk_timers::TimerId;
 use ic_stable_structures::{memory_manager::{MemoryId, MemoryManager, VirtualMemory}, DefaultMemoryImpl};
@@ -447,6 +446,15 @@ async fn restart_indexing() {
     }
 
     start_indexing_internal(indexing_config, 0);
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    let config = get_indexing_config();
+    if config.task_interval_secs > 0 {
+        // If the timer was already started, set the timer again at the time of upgrade.
+        start_indexing_internal(config, 0);
+    }
 }
 
 #[cfg(test)]

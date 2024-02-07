@@ -126,6 +126,8 @@ thread_local! {
          ).unwrap()
     );
 
+    // NOTE: TimerId cannot be stored in stable memory
+    // https://github.com/dfinity/cdk-rs/issues/392
     static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(None);
 }
 
@@ -211,6 +213,9 @@ fn _timer_id() -> Option<TimerId> {
 }
 fn _set_timer_id(id: TimerId) {
     TIMER_ID.with(|state: &RefCell<Option<TimerId>>| *state.borrow_mut() = Some(id));
+}
+fn _reset_timer_id() {
+    TIMER_ID.with(|state: &RefCell<Option<TimerId>>| *state.borrow_mut() = None);
 }
 
 #[ic_cdk::init]
@@ -424,6 +429,24 @@ async fn request_upgrades_to_registry() {
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");
+}
+
+/// Restart indexing task
+/// NOTE: Intended to be used when restarting after cycles are exhausted
+///       Duplicate timer run if canister is stopped/restarted normally
+/// ref: https://internetcomputer.org/docs/current/references/ic-interface-spec#global-timer
+#[update]
+#[candid_method(update)]
+async fn restart_indexing() {
+    let indexing_config = get_indexing_config();
+    assert!(indexing_config.task_interval_secs > 0, "indexing_config is not yet set");
+
+    if let Some(timer_id) = _timer_id() {
+        ic_cdk_timers::clear_timer(timer_id);
+        _reset_timer_id();
+    }
+
+    start_indexing_internal(indexing_config, 0);
 }
 
 #[cfg(test)]

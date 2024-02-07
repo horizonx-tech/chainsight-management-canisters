@@ -44,6 +44,7 @@ service : (principal, principal, principal, principal) -> {
   proxy_call : (text, vec nat8) -> (Result);
   registry : () -> (principal) query;
   request_upgrades_to_registry : () -> ();
+  restart_indexing : () -> ();
   set_registry : (principal) -> ();
   start_indexing : (nat32, nat32, text, vec nat8) -> ();
   target : () -> (principal) query;

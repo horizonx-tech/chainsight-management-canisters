@@ -2,9 +2,9 @@ use std::{borrow::Cow, cell::RefCell};
 
 use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
-    api::call::{CallResult, RejectionCode},
-    query, update,
+    api::call::{CallResult, RejectionCode}, post_upgrade, query, update
 };
+use ic_cdk_timers::TimerId;
 use ic_stable_structures::{memory_manager::{MemoryId, MemoryManager, VirtualMemory}, DefaultMemoryImpl};
 use serde::{Deserialize, Serialize};
 
@@ -124,6 +124,10 @@ thread_local! {
             0,
          ).unwrap()
     );
+
+    // NOTE: TimerId cannot be stored in stable memory
+    // https://github.com/dfinity/cdk-rs/issues/392
+    static TIMER_ID: RefCell<Option<TimerId>> = RefCell::new(None);
 }
 
 #[query]
@@ -201,6 +205,16 @@ fn _initializer() -> Principal {
 fn _set_initializer(id: Principal) {
     let res = INITIALIZER.with(|db| db.borrow_mut().set(id.to_text()));
     res.unwrap();
+}
+
+fn _timer_id() -> Option<TimerId> {
+    TIMER_ID.with(|state| *state.borrow())
+}
+fn _set_timer_id(id: TimerId) {
+    TIMER_ID.with(|state: &RefCell<Option<TimerId>>| *state.borrow_mut() = Some(id));
+}
+fn _reset_timer_id() {
+    TIMER_ID.with(|state: &RefCell<Option<TimerId>>| *state.borrow_mut() = None);
 }
 
 #[ic_cdk::init]
@@ -358,15 +372,19 @@ fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32) {
         round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
             - current_time_sec;
     set_indexing_config(indexing_config);
-    ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
-        ic_cdk_timers::set_timer_interval(
+    let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+        let timer_id = ic_cdk_timers::set_timer_interval(
             std::time::Duration::from_secs(task_interval_secs as u64),
             || {
                 ic_cdk::spawn(async move { index().await });
             },
         );
+        ic_cdk::spawn(async move { index().await }); // First execution after waiting for delay secs
+        _set_timer_id(timer_id); // Save to overwrite TimerId by set_timer
     });
-    set_next_schedule((current_time_sec + delay + get_indexing_config().task_interval_secs) as u64);
+    _set_timer_id(timer_id);
+    let next_schedule = current_time_sec + delay;
+    set_next_schedule(next_schedule as u64);
 }
 
 async fn index() {
@@ -410,6 +428,33 @@ async fn request_upgrades_to_registry() {
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");
+}
+
+/// Restart indexing task
+/// NOTE: Intended to be used when restarting after cycles are exhausted
+///       Duplicate timer run if canister is stopped/restarted normally
+/// ref: https://internetcomputer.org/docs/current/references/ic-interface-spec#global-timer
+#[update]
+#[candid_method(update)]
+async fn restart_indexing() {
+    let indexing_config = get_indexing_config();
+    assert!(indexing_config.task_interval_secs > 0, "indexing_config is not yet set");
+
+    if let Some(timer_id) = _timer_id() {
+        ic_cdk_timers::clear_timer(timer_id);
+        _reset_timer_id();
+    }
+
+    start_indexing_internal(indexing_config, 0);
+}
+
+#[post_upgrade]
+fn post_upgrade() {
+    let config = get_indexing_config();
+    if config.task_interval_secs > 0 {
+        // If the timer was already started, set the timer again at the time of upgrade.
+        start_indexing_internal(config, 0);
+    }
 }
 
 #[cfg(test)]

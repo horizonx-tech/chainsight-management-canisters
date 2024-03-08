@@ -18,6 +18,8 @@ type IndexingConfig = record {
   method : text;
   args : vec nat8;
   task_interval_secs : nat32;
+  delay_secs : nat32;
+  is_rounded_start_time : bool;
 };
 type RejectionCode = variant {
   NoError;

@@ -23,6 +23,8 @@ pub struct IndexingConfig {
     pub task_interval_secs: u32,
     pub method: String,
     pub args: Vec<u8>,
+    pub delay_secs: u32,
+    pub is_rounded_start_time: bool
 }
 impl ic_stable_structures::Storable for IndexingConfig {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
@@ -360,15 +362,21 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, is_rounded_start
         task_interval_secs,
         method,
         args,
+        delay_secs,
+        is_rounded_start_time
     };
-    start_indexing_internal(indexing_config, delay_secs, is_rounded_start_time);
+    start_indexing_internal(indexing_config);
 }
-fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32, is_rounded_start_time: bool) {
+fn start_indexing_internal(indexing_config: IndexingConfig) {
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
-    let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
-
-    let task_interval_secs = indexing_config.task_interval_secs;
+    let IndexingConfig {
+        task_interval_secs,
+        delay_secs,
+        is_rounded_start_time,
+        ..
+     } = indexing_config;
     let delay = if is_rounded_start_time {
+        let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
         round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
                 - current_time_sec
     } else {
@@ -460,7 +468,7 @@ async fn restart_indexing() {
         _reset_timer_id();
     }
 
-    start_indexing_internal(indexing_config, 0, true);
+    start_indexing_internal(indexing_config);
 }
 
 #[post_upgrade]
@@ -468,7 +476,7 @@ fn post_upgrade() {
     let config = get_indexing_config();
     if config.task_interval_secs > 0 {
         // If the timer was already started, set the timer again at the time of upgrade.
-        start_indexing_internal(config, 0, true);
+        start_indexing_internal(config);
     }
 }
 

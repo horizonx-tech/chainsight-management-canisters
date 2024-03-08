@@ -1,6 +1,6 @@
 use std::{borrow::Cow, cell::RefCell};
 
-use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
+use candid::{candid_method, de, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode}, post_upgrade, query, update
 };
@@ -352,7 +352,7 @@ fn set_indexing_config(config: IndexingConfig) {
 
 #[update]
 #[candid_method(update)]
-pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, args: Vec<u8>) {
+pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, is_rounded_start_time: bool, method: String, args: Vec<u8>) {
     assert!(ic_cdk::caller() == _target(), "Not permitted");
     assert!(next_schedule() == 0, "Already started");
 
@@ -361,30 +361,45 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, 
         method,
         args,
     };
-    start_indexing_internal(indexing_config, delay_secs);
+    start_indexing_internal(indexing_config, delay_secs, is_rounded_start_time);
 }
-fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32) {
+fn start_indexing_internal(indexing_config: IndexingConfig, delay_secs: u32, is_rounded_start_time: bool) {
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
     let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
 
     let task_interval_secs = indexing_config.task_interval_secs;
-    let delay =
+    let delay = if is_rounded_start_time {
         round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
-            - current_time_sec;
+                - current_time_sec
+    } else {
+        delay_secs
+    };
+
     set_indexing_config(indexing_config);
-    let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+
+    if delay > 0 {
+        let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
+            let timer_id = ic_cdk_timers::set_timer_interval(
+                std::time::Duration::from_secs(task_interval_secs as u64),
+                || {
+                    ic_cdk::spawn(async move { index().await });
+                },
+            );
+            ic_cdk::spawn(async move { index().await }); // First execution after waiting for delay secs
+            _set_timer_id(timer_id); // Save to overwrite TimerId by set_timer
+        });
+        _set_timer_id(timer_id);
+        set_next_schedule((current_time_sec + delay) as u64);
+    } else {
+        ic_cdk::spawn(async move { index().await }); // If there is no delay, the program is executed immediately.
         let timer_id = ic_cdk_timers::set_timer_interval(
             std::time::Duration::from_secs(task_interval_secs as u64),
             || {
                 ic_cdk::spawn(async move { index().await });
             },
         );
-        ic_cdk::spawn(async move { index().await }); // First execution after waiting for delay secs
-        _set_timer_id(timer_id); // Save to overwrite TimerId by set_timer
-    });
-    _set_timer_id(timer_id);
-    let next_schedule = current_time_sec + delay;
-    set_next_schedule(next_schedule as u64);
+        _set_timer_id(timer_id);
+    };
 }
 
 async fn index() {
@@ -445,7 +460,7 @@ async fn restart_indexing() {
         _reset_timer_id();
     }
 
-    start_indexing_internal(indexing_config, 0);
+    start_indexing_internal(indexing_config, 0, true);
 }
 
 #[post_upgrade]
@@ -453,7 +468,7 @@ fn post_upgrade() {
     let config = get_indexing_config();
     if config.task_interval_secs > 0 {
         // If the timer was already started, set the timer again at the time of upgrade.
-        start_indexing_internal(config, 0);
+        start_indexing_internal(config, 0, true);
     }
 }
 

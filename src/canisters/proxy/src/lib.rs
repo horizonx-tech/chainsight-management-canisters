@@ -376,9 +376,7 @@ fn start_indexing_internal(indexing_config: IndexingConfig) {
         ..
      } = indexing_config;
     let delay = if is_rounded_start_time {
-        let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
-        round_timestamp(current_time_sec, task_interval_secs) + task_interval_secs + delay_secs
-                - current_time_sec
+        calculate_delay_secs_from_current_secs(current_time_sec, task_interval_secs, delay_secs)
     } else {
         delay_secs
     };
@@ -408,6 +406,12 @@ fn start_indexing_internal(indexing_config: IndexingConfig) {
         );
         _set_timer_id(timer_id);
     };
+}
+
+fn calculate_delay_secs_from_current_secs(current: u32, interval: u32, delay_secs: u32) -> u32 {
+    let round_timestamp = |ts: u32, unit: u32| ts / unit * unit;
+    round_timestamp(current, interval) + interval + delay_secs
+            - current
 }
 
 async fn index() {
@@ -490,23 +494,32 @@ mod tests {
         std::fs::write("proxy.did", __export_service()).unwrap();
     }
 
-    // fn registry_for_test() -> Principal {
-    //     Principal::from_text("rrkah-fqaaa-aaaaa-aaaaq-cai").unwrap()
-    // }
-    // fn target_for_test() -> Principal {
-    //     Principal::from_text("ua42s-gaaaa-aaaal-achcq-cai").unwrap()
-    // }
-    // fn db_for_test() -> Principal {
-    //     Principal::from_text("uh54g-lyaaa-aaaal-achca-cai").unwrap()
-    // }
-    // #[test]
-    // fn test_init() {
-    //     let registry = registry_for_test();
-    //     let target = target_for_test();
-    //     let db = db_for_test();
-    //     init(registry, target, db);
-    //     assert_eq!(_registry(), registry);
-    //     assert_eq!(_target(), target);
-    //     assert_eq!(_db(), db);
-    // }
+    #[test]
+    fn test_calculate_delay_secs_from_current_secs() {
+        let secs_20200101_000000 = 946684800;
+        assert_eq!(
+            calculate_delay_secs_from_current_secs(
+                secs_20200101_000000 + 15,
+                60,
+                0
+            ),
+            45
+        );
+        assert_eq!(
+            calculate_delay_secs_from_current_secs(
+                secs_20200101_000000 + 15,
+                90,
+                0
+            ),
+            75
+        );
+        assert_eq!(
+            calculate_delay_secs_from_current_secs(
+                secs_20200101_000000 + 10 * 60,
+                60 * 60,
+                30
+            ),
+            50 * 60 + 30
+        );
+    }
 }

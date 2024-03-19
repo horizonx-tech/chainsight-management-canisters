@@ -354,7 +354,14 @@ fn set_indexing_config(config: IndexingConfig) {
 
 #[update]
 #[candid_method(update)]
-pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, is_rounded_start_time: bool, method: String, args: Vec<u8>) {
+pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, method: String, args: Vec<u8>) {
+    start_indexing_with_is_rounded(task_interval_secs, delay_secs, false, method, args);
+}
+// NOTE: `start_indexing` is kept for backward compatibility, `is_rounded_start_time` is added to the interface
+//       Integrate with `start_indexing` when destructive changes are possible
+#[update]
+#[candid_method(update)]
+pub fn start_indexing_with_is_rounded(task_interval_secs: u32, delay_secs: u32, is_rounded_start_time: bool, method: String, args: Vec<u8>) {
     assert!(ic_cdk::caller() == _target(), "Not permitted");
     assert!(next_schedule() == 0, "Already started");
 
@@ -367,6 +374,7 @@ pub fn start_indexing(task_interval_secs: u32, delay_secs: u32, is_rounded_start
     };
     start_indexing_internal(indexing_config);
 }
+
 fn start_indexing_internal(indexing_config: IndexingConfig) {
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
     let IndexingConfig {

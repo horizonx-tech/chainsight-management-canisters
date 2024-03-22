@@ -1,6 +1,6 @@
 use std::{borrow::Cow, cell::RefCell};
 
-use candid::{candid_method, de, CandidType, Decode, Encode, Int, Principal};
+use candid::{candid_method, CandidType, Decode, Encode, Int, Principal};
 use ic_cdk::{
     api::call::{CallResult, RejectionCode}, post_upgrade, query, update
 };

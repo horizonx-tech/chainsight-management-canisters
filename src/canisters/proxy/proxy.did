@@ -18,6 +18,8 @@ type IndexingConfig = record {
   method : text;
   args : vec nat8;
   task_interval_secs : nat32;
+  delay_secs : nat32;
+  is_rounded_start_time : bool;
 };
 type RejectionCode = variant {
   NoError;
@@ -47,6 +49,7 @@ service : (principal, principal, principal, principal) -> {
   restart_indexing : () -> ();
   set_registry : (principal) -> ();
   start_indexing : (nat32, nat32, text, vec nat8) -> ();
+  start_indexing_with_is_rounded : (nat32, nat32, bool, text, vec nat8) -> ();
   target : () -> (principal) query;
   vault : () -> (principal) query;
 }

@@ -38,6 +38,8 @@ install:
 	dfx deploy _management_canister_registry --network http://localhost:$(port)
 	dfx canister call _management_canister_registry init --network http://localhost:$(port)
 	dfx canister call _management_canister_initializer set_registry '(principal "$(ID_REGISTRY)")' --network http://localhost:$(port)
+	dfx canister update-settings --network http://localhost:$(port) --add-controller $(ID_REGISTRY) _management_canister_initializer
+	dfx canister call --network http://localhost:$(port) _management_canister_initializer start_metrics_timer 60
 
 local:
 	make generate-did create-build install

@@ -15,9 +15,13 @@ type InitializeOutput = record {
   vault : principal;
   proxy : principal;
 };
+type MetricsSnapshot = record { cycles : nat; timestamp : nat64 };
 service : {
+  get_last_metrics : () -> (opt MetricsSnapshot) query;
+  get_metrics_interval_secs : () -> (opt nat64) query;
   get_registry : () -> (principal) query;
   initialize : (principal, CycleManagements) -> (InitializeOutput);
   set_registry : (principal) -> ();
+  start_metrics_timer : (nat64) -> ();
   upgrade_proxies : () -> ();
 }

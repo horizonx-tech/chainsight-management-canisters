@@ -4,19 +4,17 @@ use ic_cdk::{
         call::CallResult,
         management_canister::{
             main::{
-                create_canister, deposit_cycles, install_code, update_settings,
-                CanisterInstallMode, CreateCanisterArgument, InstallCodeArgument,
-                UpdateSettingsArgument,
+                canister_status, create_canister, deposit_cycles, install_code, update_settings, CanisterInstallMode, CreateCanisterArgument, InstallCodeArgument, UpdateSettingsArgument
             },
             provisional::{CanisterIdRecord, CanisterSettings},
         },
-    },
-    query, update, pre_upgrade, storage, post_upgrade,
+    }, caller, post_upgrade, pre_upgrade, query, storage, update
 };
+use ic_cdk_timers::TimerId;
 use std::cell::RefCell;
 
 mod types;
-use types::{InitializeOutput, CycleManagements, RefuelTarget, RegisteredCanisterInRegistry, ComponentInfoFromProxy};
+use types::{ComponentInfoFromProxy, CycleManagements, InitializeOutput, MetricsSnapshot, RefuelTarget, RegisteredCanisterInRegistry};
 
 use crate::types::UpgradeStableState;
 
@@ -26,6 +24,9 @@ const DB_WASM: &[u8] = include_bytes!("../../../../artifacts/registry.wasm.gz");
 
 thread_local! {
     static REGISTRY: RefCell<Principal> = RefCell::new(Principal::anonymous());
+
+    static METRIC_TIMER_ID: RefCell<Option<(TimerId, u64)>> = RefCell::new(None); // with interval_secs
+    static METRICS: RefCell<Vec<MetricsSnapshot>> = RefCell::new(Vec::new());
 }
 
 #[query]
@@ -238,6 +239,79 @@ async fn get_component_info_of_proxy(proxy: Principal) -> CallResult<(ComponentI
 async fn get_registered_canister_in_db(db: Principal, target: Principal) -> CallResult<(Option<RegisteredCanisterInRegistry>,)> {
     let out: CallResult<(Option<RegisteredCanisterInRegistry>,)> = ic_cdk::api::call::call(db, "getRegisteredCanister", (target,)).await;
     out
+}
+
+#[query]
+#[candid_method(query)]
+fn get_last_metrics() -> Option<MetricsSnapshot> {
+    METRICS.with(|mem| {
+        let metrics = mem.borrow();
+        if metrics.is_empty() {
+            return None
+        }
+        let last = metrics.last();
+        last.cloned()
+    })
+}
+
+#[query]
+#[candid_method(query)]
+fn get_metrics_interval_secs() -> Option<u64> {
+    METRIC_TIMER_ID.with(|id| {
+        if let Some((_, interval_secs)) = *id.borrow() {
+            return Some(interval_secs)
+        }
+        None
+    })
+}
+
+#[update]
+#[candid_method(update)]
+async fn start_metrics_timer(interval_secs: u64) {
+    // only controllers can start the timer
+    let res = canister_status(CanisterIdRecord {
+        canister_id: ic_cdk::id(),
+    })
+    .await
+    .unwrap()
+    .0;
+    assert!(res.settings.controllers.contains(&caller()), "Not permitted");
+
+    // clear the previous timer
+    METRIC_TIMER_ID.with(|id| {
+        if let Some((timer_id, _)) = *id.borrow() {
+            ic_cdk_timers::clear_timer(timer_id);
+        }
+    });
+
+    // execute
+    let timer_id = ic_cdk_timers::set_timer_interval(
+        std::time::Duration::from_secs(interval_secs),
+        || {
+            ic_cdk::spawn(async move { save_current_metrics().await });
+        },
+    );
+    METRIC_TIMER_ID.with(|id| *id.borrow_mut() = Some((timer_id, interval_secs)));
+    save_current_metrics().await;
+}
+
+async fn save_current_metrics() {
+    let res = canister_status(CanisterIdRecord {
+        canister_id: ic_cdk::api::id(),
+    }).await;
+    if let Ok(status) = res {
+        let cycles = u128::try_from(status.0.cycles.0).expect("Failed to convert cycles from Nat to u128");
+        let timestamp = ic_cdk::api::time();
+        ic_cdk::println!("save_current_metrics: timestamp = {}, cycles = {}", timestamp, cycles);
+        METRICS.with(|mem| {
+            // save only the latest 1 metrics
+            let mut metrics = mem.borrow_mut();
+            if !metrics.is_empty() {
+                metrics.remove(0);
+            }
+            metrics.push(MetricsSnapshot { timestamp, cycles });
+        });
+    }
 }
 
 #[pre_upgrade]

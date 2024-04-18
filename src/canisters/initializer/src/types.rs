@@ -52,6 +52,12 @@ pub struct RegisteredCanisterInRegistry {
     pub vault: Principal,
 }
 
+#[derive(CandidType, serde::Deserialize, Clone, PartialEq, Eq, Debug)]
+pub struct MetricsSnapshot {
+    pub timestamp: u64,
+    pub cycles: u128,
+}
+
 #[derive(CandidType, serde::Deserialize)]
 pub struct UpgradeStableState {
     pub registry: Principal,

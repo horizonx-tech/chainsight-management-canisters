@@ -4,7 +4,7 @@ use ic_cdk::{
         call::CallResult,
         management_canister::{
             main::{
-                canister_status, create_canister, deposit_cycles, install_code, update_settings, CanisterInstallMode, CreateCanisterArgument, InstallCodeArgument, UpdateSettingsArgument
+                canister_status, create_canister, deposit_cycles, install_code, update_settings, CanisterInstallMode, CanisterStatusResponse, CreateCanisterArgument, InstallCodeArgument, UpdateSettingsArgument
             },
             provisional::{CanisterIdRecord, CanisterSettings},
         },
@@ -312,6 +312,22 @@ async fn save_current_metrics() {
             metrics.push(MetricsSnapshot { timestamp, cycles });
         });
     }
+}
+
+#[update]
+#[candid_method(update)]
+async fn call_canister_status(canister_id: Principal) -> CanisterStatusResponse {
+    // only controllers can start the timer
+    let res = canister_status(CanisterIdRecord {
+        canister_id: ic_cdk::id(),
+    })
+    .await
+    .unwrap()
+    .0;
+    assert!(res.settings.controllers.contains(&caller()), "Not permitted");
+
+    let res = canister_status(CanisterIdRecord { canister_id }).await;
+    res.unwrap().0
 }
 
 #[pre_upgrade]

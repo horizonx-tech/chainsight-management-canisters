@@ -1,3 +1,12 @@
+type CanisterStatusResponse = record {
+  status : CanisterStatusType;
+  memory_size : nat;
+  cycles : nat;
+  settings : DefiniteCanisterSettings;
+  idle_cycles_burned_per_day : nat;
+  module_hash : opt vec nat8;
+};
+type CanisterStatusType = variant { stopped; stopping; running };
 type CycleManagement = record {
   refueling_amount : nat;
   initial_supply : nat;
@@ -10,6 +19,12 @@ type CycleManagements = record {
   proxy : CycleManagement;
   indexer : CycleManagement;
 };
+type DefiniteCanisterSettings = record {
+  freezing_threshold : nat;
+  controllers : vec principal;
+  memory_allocation : nat;
+  compute_allocation : nat;
+};
 type InitializeOutput = record {
   db : principal;
   vault : principal;
@@ -17,6 +32,7 @@ type InitializeOutput = record {
 };
 type MetricsSnapshot = record { cycles : nat; timestamp : nat64 };
 service : {
+  call_canister_status : (principal) -> (CanisterStatusResponse);
   get_last_metrics : () -> (opt MetricsSnapshot) query;
   get_metrics_interval_secs : () -> (opt nat64) query;
   get_registry : () -> (principal) query;

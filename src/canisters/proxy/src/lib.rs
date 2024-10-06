@@ -427,7 +427,7 @@ async fn index() {
     let current_time_sec = (ic_cdk::api::time() / (1000 * 1000000)) as u32;
     set_next_schedule((current_time_sec + config.task_interval_secs) as u64);
 
-    let result: CallResult<(Vec<u8>,)> =
+    let result: CallResult<(Option<Vec<u8>>,)> =
         ic_cdk::api::call::call(_target(), config.method.as_str(), (config.args,)).await;
     if result.is_ok() {
         update_last_execution_result(None);

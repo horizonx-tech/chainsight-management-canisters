@@ -4,17 +4,23 @@ use ic_cdk::{
         call::CallResult,
         management_canister::{
             main::{
-                canister_status, create_canister, deposit_cycles, install_code, update_settings, CanisterInstallMode, CanisterStatusResponse, CreateCanisterArgument, InstallCodeArgument, UpdateSettingsArgument
+                canister_status, create_canister, deposit_cycles, install_code, update_settings,
+                CanisterInstallMode, CanisterStatusResponse, CreateCanisterArgument,
+                InstallCodeArgument, UpdateSettingsArgument,
             },
             provisional::{CanisterIdRecord, CanisterSettings},
         },
-    }, caller, post_upgrade, pre_upgrade, query, storage, update
+    },
+    caller, post_upgrade, pre_upgrade, query, storage, update,
 };
 use ic_cdk_timers::TimerId;
 use std::cell::RefCell;
 
 mod types;
-use types::{ComponentInfoFromProxy, CycleManagements, InitializeOutput, MetricsSnapshot, RefuelTarget, RegisteredCanisterInRegistry};
+use types::{
+    ComponentInfoFromProxy, CycleManagements, InitializeOutput, MetricsSnapshot, RefuelTarget,
+    RegisteredCanisterInRegistry,
+};
 
 use crate::types::UpgradeStableState;
 
@@ -55,13 +61,35 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         .await
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
-    update_controllers_for_canister(&principal, controllers).await.unwrap();
-    update_controllers_for_canister(&vault, controllers).await.unwrap();
+    update_controllers_for_canister(&principal, controllers)
+        .await
+        .unwrap();
+    update_controllers_for_canister(&vault, controllers)
+        .await
+        .unwrap();
 
-    let db = create_new_canister(cycles.db.initial_supply).await.unwrap_or_else(|_| panic!("{}", format!("Failed to deploy db. deployed canisters: vault = {:?}", vault.to_text())));
-    let err_msg = format!("Failed to initialize db. deployed canisters: vault = {:?}, db = {:?}", vault.to_text(), db.to_text());
-    update_controllers_for_canister(&db, controllers).await.unwrap_or_else(|_| panic!("{}", &err_msg));
-    install_db(db).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+    let db = create_new_canister(cycles.db.initial_supply)
+        .await
+        .unwrap_or_else(|_| {
+            panic!(
+                "{}",
+                format!(
+                    "Failed to deploy db. deployed canisters: vault = {:?}",
+                    vault.to_text()
+                )
+            )
+        });
+    let err_msg = format!(
+        "Failed to initialize db. deployed canisters: vault = {:?}, db = {:?}",
+        vault.to_text(),
+        db.to_text()
+    );
+    update_controllers_for_canister(&db, controllers)
+        .await
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
+    install_db(db)
+        .await
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "DB of {:?} installed at {:?}",
         principal.to_string(),
@@ -71,21 +99,46 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
 
     let proxy = create_new_canister(cycles.proxy.initial_supply)
         .await
-        .unwrap_or_else(|_| panic!("{}", &format!("Failed to deploy proxy. deployed canisters: vault = {:?}, db = {:?}", vault.to_text(), db.to_text())));
-    let err_msg = format!("Failed to initialize proxy. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}", vault.to_text(), db.to_text(), proxy.to_text());
-    update_controllers_for_canister(&proxy, controllers).await.unwrap_or_else(|_| panic!("{}", &err_msg));
-    install_proxy(proxy, principal, db, vault).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|_| {
+            panic!(
+                "{}",
+                &format!(
+                    "Failed to deploy proxy. deployed canisters: vault = {:?}, db = {:?}",
+                    vault.to_text(),
+                    db.to_text()
+                )
+            )
+        });
+    let err_msg = format!(
+        "Failed to initialize proxy. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}",
+        vault.to_text(),
+        db.to_text(),
+        proxy.to_text()
+    );
+    update_controllers_for_canister(&proxy, controllers)
+        .await
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
+    install_proxy(proxy, principal, db, vault)
+        .await
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
         principal.to_string(),
         proxy.to_string()
     );
 
-    let err_msg = format!("Failed to initialize vault. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}", vault.to_text(), db.to_text(), proxy.to_text());
+    let err_msg = format!(
+        "Failed to initialize vault. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}",
+        vault.to_text(),
+        db.to_text(),
+        proxy.to_text()
+    );
     install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
         .await
         .unwrap_or_else(|_| panic!("{}", &err_msg));
-    register_canister_of_registry(principal, vault).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+    register_canister_of_registry(principal, vault)
+        .await
+        .unwrap_or_else(|_| panic!("{}", &err_msg));
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
         principal.to_string(),
@@ -150,7 +203,12 @@ async fn init_db(db: Principal) -> CallResult<()> {
     out
 }
 
-async fn install_proxy(created: Principal, target: Principal, db: Principal, vault: Principal) -> CallResult<()> {
+async fn install_proxy(
+    created: Principal,
+    target: Principal,
+    db: Principal,
+    vault: Principal,
+) -> CallResult<()> {
     let canister_id = created.clone();
     let registry = get_registry();
     _install(
@@ -171,7 +229,10 @@ async fn _install(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) ->
     .await
 }
 
-async fn update_controllers_for_canister(canister_id: &Principal, controllers: &Vec<Principal>) -> CallResult<()> {
+async fn update_controllers_for_canister(
+    canister_id: &Principal,
+    controllers: &Vec<Principal>,
+) -> CallResult<()> {
     update_settings(UpdateSettingsArgument {
         canister_id: canister_id.clone(),
         settings: CanisterSettings {
@@ -187,7 +248,7 @@ async fn update_controllers_for_canister(canister_id: &Principal, controllers: &
 async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
     let canister_id = create_canister(
         CreateCanisterArgument { settings: None },
-        100_000_000_000u128 // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+        100_000_000_000u128, // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
     )
     .await?
     .0
@@ -206,22 +267,38 @@ async fn register_canister_of_registry(principal: Principal, vault: Principal) -
 async fn upgrade_proxies() {
     let caller_proxy = ic_cdk::caller();
     let registry = get_registry();
-    let ComponentInfoFromProxy { target: component_canister, vault, db } = get_component_info_of_proxy(caller_proxy.clone())
+    let ComponentInfoFromProxy {
+        target: component_canister,
+        vault,
+        db,
+    } = get_component_info_of_proxy(caller_proxy.clone())
         .await
         .expect("Failed to call 'target' to Proxy")
         .0;
 
     // check if caller is a registered proxy
-    let res = get_registered_canister_in_db(registry, component_canister).await.expect("Failed to call 'getRegisteredCanister' to Registry");
+    let res = get_registered_canister_in_db(registry, component_canister)
+        .await
+        .expect("Failed to call 'getRegisteredCanister' to Registry");
     assert!(res.0.is_some(), "Caller is not a registered proxy");
 
     // install_code with upgrade mode
-    let _ = install_for_upgrade(db, DB_WASM.to_vec(), vec![]).await.expect("Failed to upgrade DB for proxy");
-    let _ = install_for_upgrade(vault, VAULT_WASM.to_vec(), vec![]).await.expect("Failed to upgrade Vault for proxy");
-    let _ = install_for_upgrade(caller_proxy, PROXY_WASM.to_vec(), vec![]).await.expect("Failed to upgrade Proxy for proxy");
+    let _ = install_for_upgrade(db, DB_WASM.to_vec(), vec![])
+        .await
+        .expect("Failed to upgrade DB for proxy");
+    let _ = install_for_upgrade(vault, VAULT_WASM.to_vec(), vec![])
+        .await
+        .expect("Failed to upgrade Vault for proxy");
+    let _ = install_for_upgrade(caller_proxy, PROXY_WASM.to_vec(), vec![])
+        .await
+        .expect("Failed to upgrade Proxy for proxy");
 }
 
-async fn install_for_upgrade(canister_id: Principal, wasm_module: Vec<u8>, arg: Vec<u8>) -> CallResult<()> {
+async fn install_for_upgrade(
+    canister_id: Principal,
+    wasm_module: Vec<u8>,
+    arg: Vec<u8>,
+) -> CallResult<()> {
     install_code(InstallCodeArgument {
         mode: CanisterInstallMode::Upgrade,
         canister_id,
@@ -232,12 +309,17 @@ async fn install_for_upgrade(canister_id: Principal, wasm_module: Vec<u8>, arg: 
 }
 
 async fn get_component_info_of_proxy(proxy: Principal) -> CallResult<(ComponentInfoFromProxy,)> {
-    let out: CallResult<(ComponentInfoFromProxy,)> = ic_cdk::api::call::call(proxy, "get_component_info", ()).await;
+    let out: CallResult<(ComponentInfoFromProxy,)> =
+        ic_cdk::api::call::call(proxy, "get_component_info", ()).await;
     out
 }
 
-async fn get_registered_canister_in_db(db: Principal, target: Principal) -> CallResult<(Option<RegisteredCanisterInRegistry>,)> {
-    let out: CallResult<(Option<RegisteredCanisterInRegistry>,)> = ic_cdk::api::call::call(db, "getRegisteredCanister", (target,)).await;
+async fn get_registered_canister_in_db(
+    db: Principal,
+    target: Principal,
+) -> CallResult<(Option<RegisteredCanisterInRegistry>,)> {
+    let out: CallResult<(Option<RegisteredCanisterInRegistry>,)> =
+        ic_cdk::api::call::call(db, "getRegisteredCanister", (target,)).await;
     out
 }
 
@@ -247,7 +329,7 @@ fn get_last_metrics() -> Option<MetricsSnapshot> {
     METRICS.with(|mem| {
         let metrics = mem.borrow();
         if metrics.is_empty() {
-            return None
+            return None;
         }
         let last = metrics.last();
         last.cloned()
@@ -259,7 +341,7 @@ fn get_last_metrics() -> Option<MetricsSnapshot> {
 fn get_metrics_interval_secs() -> Option<u64> {
     METRIC_TIMER_ID.with(|id| {
         if let Some((_, interval_secs)) = *id.borrow() {
-            return Some(interval_secs)
+            return Some(interval_secs);
         }
         None
     })
@@ -275,7 +357,10 @@ async fn start_metrics_timer(interval_secs: u64) {
     .await
     .unwrap()
     .0;
-    assert!(res.settings.controllers.contains(&caller()), "Not permitted");
+    assert!(
+        res.settings.controllers.contains(&caller()),
+        "Not permitted"
+    );
 
     // clear the previous timer
     METRIC_TIMER_ID.with(|id| {
@@ -285,12 +370,10 @@ async fn start_metrics_timer(interval_secs: u64) {
     });
 
     // execute
-    let timer_id = ic_cdk_timers::set_timer_interval(
-        std::time::Duration::from_secs(interval_secs),
-        || {
+    let timer_id =
+        ic_cdk_timers::set_timer_interval(std::time::Duration::from_secs(interval_secs), || {
             ic_cdk::spawn(async move { save_current_metrics().await });
-        },
-    );
+        });
     METRIC_TIMER_ID.with(|id| *id.borrow_mut() = Some((timer_id, interval_secs)));
     save_current_metrics().await;
 }
@@ -298,11 +381,17 @@ async fn start_metrics_timer(interval_secs: u64) {
 async fn save_current_metrics() {
     let res = canister_status(CanisterIdRecord {
         canister_id: ic_cdk::api::id(),
-    }).await;
+    })
+    .await;
     if let Ok(status) = res {
-        let cycles = u128::try_from(status.0.cycles.0).expect("Failed to convert cycles from Nat to u128");
+        let cycles =
+            u128::try_from(status.0.cycles.0).expect("Failed to convert cycles from Nat to u128");
         let timestamp = ic_cdk::api::time();
-        ic_cdk::println!("save_current_metrics: timestamp = {}, cycles = {}", timestamp, cycles);
+        ic_cdk::println!(
+            "save_current_metrics: timestamp = {}, cycles = {}",
+            timestamp,
+            cycles
+        );
         METRICS.with(|mem| {
             // save only the latest 1 metrics
             let mut metrics = mem.borrow_mut();
@@ -324,7 +413,10 @@ async fn call_canister_status(canister_id: Principal) -> CanisterStatusResponse 
     .await
     .unwrap()
     .0;
-    assert!(res.settings.controllers.contains(&caller()), "Not permitted");
+    assert!(
+        res.settings.controllers.contains(&caller()),
+        "Not permitted"
+    );
 
     let res = canister_status(CanisterIdRecord { canister_id }).await;
     res.unwrap().0
@@ -346,7 +438,8 @@ fn pre_upgrade() {
 fn post_upgrade() {
     ic_cdk::println!("start: post_upgrade");
 
-    let (state,): (UpgradeStableState,) = storage::stable_restore().expect("Failed to restore stable state");
+    let (state,): (UpgradeStableState,) =
+        storage::stable_restore().expect("Failed to restore stable state");
     set_registry(state.registry);
 
     ic_cdk::println!("finish: post_upgrade");

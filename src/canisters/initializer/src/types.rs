@@ -7,7 +7,6 @@ pub struct InitializeOutput {
     pub db: Principal,
 }
 
-
 #[derive(CandidType, serde::Deserialize, Clone, Copy)]
 pub struct CycleManagement {
     pub initial_supply: u128,

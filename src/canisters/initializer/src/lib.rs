@@ -16,6 +16,7 @@ use ic_cdk::{
 use ic_cdk_timers::TimerId;
 use std::cell::RefCell;
 
+mod cmc;
 mod types;
 use types::{
     ComponentInfoFromProxy, CycleManagements, InitializeOutput, MetricsSnapshot, RefuelTarget,

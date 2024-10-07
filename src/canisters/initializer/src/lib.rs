@@ -1,12 +1,16 @@
 use candid::{candid_method, encode_args, Principal};
+use cmc::{
+    cmc,
+    types::{CreateCanisterArg, CreateCanisterResult, SubnetSelection},
+};
 use ic_cdk::{
     api::{
         call::CallResult,
         management_canister::{
             main::{
-                canister_status, create_canister, deposit_cycles, install_code, update_settings,
-                CanisterInstallMode, CanisterStatusResponse, CreateCanisterArgument,
-                InstallCodeArgument, UpdateSettingsArgument,
+                canister_status, deposit_cycles, install_code, update_settings,
+                CanisterInstallMode, CanisterStatusResponse, InstallCodeArgument,
+                UpdateSettingsArgument,
             },
             provisional::{CanisterIdRecord, CanisterSettings},
         },
@@ -50,7 +54,11 @@ fn set_registry(id: Principal) {
 
 #[update]
 #[candid_method(update)]
-async fn initialize(deployer: Principal, cycles: CycleManagements) -> InitializeOutput {
+async fn initialize(
+    deployer: Principal,
+    cycles: CycleManagements,
+    subnet: Option<Principal>,
+) -> InitializeOutput {
     let deposits_total = cycles.initial_supply();
     if deposits_total > ic_cdk::api::call::msg_cycles_accept128(deposits_total) {
         panic!("Acceptable cycles are less than the specified in parameters.")
@@ -58,7 +66,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
 
     let principal = ic_cdk::caller();
 
-    let vault = create_new_canister(cycles.vault_intial_supply)
+    let vault = create_new_canister(cycles.vault_intial_supply, subnet)
         .await
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
@@ -69,7 +77,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
         .await
         .unwrap();
 
-    let db = create_new_canister(cycles.db.initial_supply)
+    let db = create_new_canister(cycles.db.initial_supply, subnet)
         .await
         .unwrap_or_else(|_| {
             panic!(
@@ -98,7 +106,7 @@ async fn initialize(deployer: Principal, cycles: CycleManagements) -> Initialize
     );
     init_db(db).await.unwrap_or_else(|_| panic!("{}", &err_msg));
 
-    let proxy = create_new_canister(cycles.proxy.initial_supply)
+    let proxy = create_new_canister(cycles.proxy.initial_supply, subnet)
         .await
         .unwrap_or_else(|_| {
             panic!(
@@ -246,16 +254,36 @@ async fn update_controllers_for_canister(
     .await
 }
 
-async fn create_new_canister(deposit: u128) -> CallResult<Principal> {
-    let canister_id = create_canister(
-        CreateCanisterArgument { settings: None },
-        100_000_000_000u128, // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
-    )
-    .await?
-    .0
-    .canister_id;
-    deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
-    Ok(canister_id)
+async fn create_new_canister(deposit: u128, subnet: Option<Principal>) -> CallResult<Principal> {
+    let result = cmc()
+        .create_canister(
+            CreateCanisterArg {
+                subnet_selection: subnet.map(|subnet| SubnetSelection::Subnet { subnet }),
+                settings: None,
+                subnet_type: None,
+            },
+            100_000_000_000u128, // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+        )
+        .await?
+        .0;
+    match result {
+        CreateCanisterResult::Ok(canister_id) => {
+            deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
+            Ok(canister_id)
+        }
+        CreateCanisterResult::Err(err) => match err {
+            cmc::types::CreateCanisterError::Refunded {
+                create_error,
+                refund_amount,
+            } => {
+                ic_cdk::trap(&format!(
+                    "Failed to create canister: {:?}, refunded amount: {:?}",
+                    create_error, refund_amount
+                ));
+            }
+            _ => ic_cdk::trap(&format!("Failed to create canister")),
+        },
+    }
 }
 
 async fn register_canister_of_registry(principal: Principal, vault: Principal) -> CallResult<()> {

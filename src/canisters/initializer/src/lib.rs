@@ -281,7 +281,6 @@ async fn create_new_canister(deposit: u128, subnet: Option<Principal>) -> CallRe
                     create_error, refund_amount
                 ));
             }
-            _ => ic_cdk::trap(&format!("Failed to create canister")),
         },
     }
 }

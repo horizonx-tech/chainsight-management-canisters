@@ -66,7 +66,7 @@ async fn initialize(
 
     let principal = ic_cdk::caller();
 
-    let vault = create_new_canister(cycles.vault_intial_supply, subnet)
+    let vault = create_new_canister_with_deposit(cycles.vault_intial_supply, subnet)
         .await
         .unwrap();
     let controllers = &vec![deployer, vault, ic_cdk::api::id()];
@@ -77,7 +77,7 @@ async fn initialize(
         .await
         .unwrap();
 
-    let db = create_new_canister(cycles.db.initial_supply, subnet)
+    let db = create_new_canister_with_deposit(cycles.db.initial_supply, subnet)
         .await
         .unwrap_or_else(|e| {
             panic!(
@@ -109,7 +109,7 @@ async fn initialize(
         .await
         .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
 
-    let proxy = create_new_canister(cycles.proxy.initial_supply, subnet)
+    let proxy = create_new_canister_with_deposit(cycles.proxy.initial_supply, subnet)
         .await
         .unwrap_or_else(|_| {
             panic!(
@@ -257,14 +257,24 @@ async fn update_controllers_for_canister(
     .await
 }
 
-async fn create_new_canister(deposit: u128, subnet: Option<Principal>) -> CallResult<Principal> {
+async fn create_new_canister_with_deposit(
+    deposit: u128,
+    subnet: Option<Principal>,
+) -> CallResult<Principal> {
+    let canister_id = create_new_canister(subnet).await?;
+    deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
+    Ok(canister_id)
+}
+
+async fn create_new_canister(subnet: Option<Principal>) -> CallResult<Principal> {
     let cycles = 100_000_000_000u128; // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
-    
+
     if subnet.is_none() {
         let result = create_canister(CreateCanisterArgument { settings: None }, cycles)
             .await?
             .0;
-        return Ok(result.canister_id);
+        let canister_id = result.canister_id;
+        return Ok(canister_id);
     }
 
     let result = cmc()
@@ -281,10 +291,7 @@ async fn create_new_canister(deposit: u128, subnet: Option<Principal>) -> CallRe
         .await?
         .0;
     match result {
-        CreateCanisterResult::Ok(canister_id) => {
-            deposit_cycles(CanisterIdRecord { canister_id }, deposit).await?;
-            Ok(canister_id)
-        }
+        CreateCanisterResult::Ok(canister_id) => Ok(canister_id),
         CreateCanisterResult::Err(err) => match err {
             cmc::types::CreateCanisterError::Refunded {
                 create_error,

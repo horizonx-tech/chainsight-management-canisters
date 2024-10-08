@@ -8,9 +8,9 @@ use ic_cdk::{
         call::CallResult,
         management_canister::{
             main::{
-                canister_status, deposit_cycles, install_code, update_settings,
-                CanisterInstallMode, CanisterStatusResponse, InstallCodeArgument,
-                UpdateSettingsArgument,
+                canister_status, create_canister, deposit_cycles, install_code, update_settings,
+                CanisterInstallMode, CanisterStatusResponse, CreateCanisterArgument,
+                InstallCodeArgument, UpdateSettingsArgument,
             },
             provisional::{CanisterIdRecord, CanisterSettings},
         },
@@ -255,14 +255,25 @@ async fn update_controllers_for_canister(
 }
 
 async fn create_new_canister(deposit: u128, subnet: Option<Principal>) -> CallResult<Principal> {
+    let cycles = 100_000_000_000u128; // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+    
+    if subnet.is_none() {
+        let result = create_canister(CreateCanisterArgument { settings: None }, cycles)
+            .await?
+            .0;
+        return Ok(result.canister_id);
+    }
+
     let result = cmc()
         .create_canister(
             CreateCanisterArg {
-                subnet_selection: subnet.map(|subnet| SubnetSelection::Subnet { subnet }),
+                subnet_selection: Some(SubnetSelection::Subnet {
+                    subnet: subnet.unwrap(),
+                }),
                 settings: None,
                 subnet_type: None,
             },
-            100_000_000_000u128, // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+            cycles,
         )
         .await?
         .0;

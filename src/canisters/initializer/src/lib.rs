@@ -79,13 +79,14 @@ async fn initialize(
 
     let db = create_new_canister(cycles.db.initial_supply, subnet)
         .await
-        .unwrap_or_else(|_| {
+        .unwrap_or_else(|e| {
             panic!(
-                "{}",
+                "{} err = {:?}",
                 format!(
                     "Failed to deploy db. deployed canisters: vault = {:?}",
                     vault.to_text()
-                )
+                ),
+                e
             )
         });
     let err_msg = format!(
@@ -95,16 +96,18 @@ async fn initialize(
     );
     update_controllers_for_canister(&db, controllers)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     install_db(db)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     ic_cdk::println!(
         "DB of {:?} installed at {:?}",
         principal.to_string(),
         db.to_string()
     );
-    init_db(db).await.unwrap_or_else(|_| panic!("{}", &err_msg));
+    init_db(db)
+        .await
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
 
     let proxy = create_new_canister(cycles.proxy.initial_supply, subnet)
         .await
@@ -126,10 +129,10 @@ async fn initialize(
     );
     update_controllers_for_canister(&proxy, controllers)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     install_proxy(proxy, principal, db, vault)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     ic_cdk::println!(
         "Proxy of {:?} installed at {:?}",
         principal.to_string(),
@@ -144,10 +147,10 @@ async fn initialize(
     );
     install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     register_canister_of_registry(principal, vault)
         .await
-        .unwrap_or_else(|_| panic!("{}", &err_msg));
+        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
         principal.to_string(),

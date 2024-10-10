@@ -475,6 +475,13 @@ async fn restart_indexing() {
     let indexing_config = get_indexing_config();
     assert!(indexing_config.task_interval_secs > 0, "indexing_config is not yet set");
 
+    if !ic_cdk::api::is_controller(&ic_cdk::caller())
+        || ic_cdk::api::time() / 1_000_000_000
+            > next_schedule() + (indexing_config.task_interval_secs as u64 * 2)
+    {
+        ic_cdk::trap("Not permitted");
+    }
+
     if let Some(timer_id) = _timer_id() {
         ic_cdk_timers::clear_timer(timer_id);
         _reset_timer_id();

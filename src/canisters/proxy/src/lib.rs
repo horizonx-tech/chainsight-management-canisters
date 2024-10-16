@@ -372,7 +372,8 @@ pub fn start_indexing_with_is_rounded(task_interval_secs: u32, delay_secs: u32, 
         delay_secs: Some(delay_secs),
         is_rounded_start_time: Some(is_rounded_start_time),
     };
-    start_indexing_internal(indexing_config);
+    start_indexing_internal(indexing_config.clone());
+    set_indexing_config(indexing_config);
 }
 
 fn start_indexing_internal(indexing_config: IndexingConfig) {
@@ -388,8 +389,6 @@ fn start_indexing_internal(indexing_config: IndexingConfig) {
     } else {
         delay_secs.unwrap_or_default()
     };
-
-    set_indexing_config(indexing_config);
 
     if delay > 0 {
         let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {

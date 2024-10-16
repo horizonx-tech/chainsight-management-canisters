@@ -23,8 +23,8 @@ pub struct IndexingConfig {
     pub task_interval_secs: u32,
     pub method: String,
     pub args: Vec<u8>,
-    pub delay_secs: u32,
-    pub is_rounded_start_time: bool
+    pub delay_secs: Option<u32>,
+    pub is_rounded_start_time: Option<bool>,
 }
 impl ic_stable_structures::Storable for IndexingConfig {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
@@ -369,8 +369,8 @@ pub fn start_indexing_with_is_rounded(task_interval_secs: u32, delay_secs: u32, 
         task_interval_secs,
         method,
         args,
-        delay_secs,
-        is_rounded_start_time
+        delay_secs: Some(delay_secs),
+        is_rounded_start_time: Some(is_rounded_start_time),
     };
     start_indexing_internal(indexing_config);
 }
@@ -382,11 +382,11 @@ fn start_indexing_internal(indexing_config: IndexingConfig) {
         delay_secs,
         is_rounded_start_time,
         ..
-     } = indexing_config;
-    let delay = if is_rounded_start_time {
-        calculate_delay_secs_from_current_secs(current_time_sec, task_interval_secs, delay_secs)
+    } = indexing_config;
+    let delay = if is_rounded_start_time.is_some() {
+        calculate_delay_secs_from_current_secs(current_time_sec, task_interval_secs, delay_secs.unwrap_or_default())
     } else {
-        delay_secs
+        delay_secs.unwrap_or_default()
     };
 
     set_indexing_config(indexing_config);

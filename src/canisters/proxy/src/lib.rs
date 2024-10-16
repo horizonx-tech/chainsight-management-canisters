@@ -23,8 +23,8 @@ pub struct IndexingConfig {
     pub task_interval_secs: u32,
     pub method: String,
     pub args: Vec<u8>,
-    pub delay_secs: u32,
-    pub is_rounded_start_time: bool
+    pub delay_secs: Option<u32>,
+    pub is_rounded_start_time: Option<bool>,
 }
 impl ic_stable_structures::Storable for IndexingConfig {
     fn from_bytes(bytes: std::borrow::Cow<[u8]>) -> Self {
@@ -369,10 +369,11 @@ pub fn start_indexing_with_is_rounded(task_interval_secs: u32, delay_secs: u32, 
         task_interval_secs,
         method,
         args,
-        delay_secs,
-        is_rounded_start_time
+        delay_secs: Some(delay_secs),
+        is_rounded_start_time: Some(is_rounded_start_time),
     };
-    start_indexing_internal(indexing_config);
+    start_indexing_internal(indexing_config.clone());
+    set_indexing_config(indexing_config);
 }
 
 fn start_indexing_internal(indexing_config: IndexingConfig) {
@@ -382,14 +383,12 @@ fn start_indexing_internal(indexing_config: IndexingConfig) {
         delay_secs,
         is_rounded_start_time,
         ..
-     } = indexing_config;
-    let delay = if is_rounded_start_time {
-        calculate_delay_secs_from_current_secs(current_time_sec, task_interval_secs, delay_secs)
+    } = indexing_config;
+    let delay = if is_rounded_start_time.is_some() {
+        calculate_delay_secs_from_current_secs(current_time_sec, task_interval_secs, delay_secs.unwrap_or_default())
     } else {
-        delay_secs
+        delay_secs.unwrap_or_default()
     };
-
-    set_indexing_config(indexing_config);
 
     if delay > 0 {
         let timer_id = ic_cdk_timers::set_timer(std::time::Duration::from_secs(delay as u64), move || {
@@ -453,13 +452,9 @@ fn update_last_execution_result(error: Option<Error>) {
 #[update]
 #[candid_method(update)]
 async fn request_upgrades_to_registry() {
-    //// TODO: validation, should it be called from the main body canister?
-    // let caller = ic_cdk::caller();
-    // NOTE: use `is_controller` if ic-cdk >= 0.8
-    // let status = ic_cdk::api::management_canister::main::canister_status(CanisterIdRecord {
-    //     canister_id: ic_cdk::api::id(),
-    // }).await.expect("Failed to get canister status").0;
-    // assert!(status.settings.controllers.contains(&caller), "Not controlled");
+    if !ic_cdk::api::is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Not permitted");
+    }
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");
@@ -495,7 +490,10 @@ fn post_upgrade() {
     let config = get_indexing_config();
     if config.task_interval_secs > 0 {
         // If the timer was already started, set the timer again at the time of upgrade.
-        start_indexing_internal(config);
+        start_indexing_internal(IndexingConfig {
+            delay_secs: Some(1), // inter-canister call cannot be executed in init/post_upgrade
+            ..config
+        });
     }
 }
 

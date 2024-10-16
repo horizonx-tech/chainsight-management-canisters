@@ -453,13 +453,9 @@ fn update_last_execution_result(error: Option<Error>) {
 #[update]
 #[candid_method(update)]
 async fn request_upgrades_to_registry() {
-    //// TODO: validation, should it be called from the main body canister?
-    // let caller = ic_cdk::caller();
-    // NOTE: use `is_controller` if ic-cdk >= 0.8
-    // let status = ic_cdk::api::management_canister::main::canister_status(CanisterIdRecord {
-    //     canister_id: ic_cdk::api::id(),
-    // }).await.expect("Failed to get canister status").0;
-    // assert!(status.settings.controllers.contains(&caller), "Not controlled");
+    if !ic_cdk::api::is_controller(&ic_cdk::caller()) {
+        ic_cdk::trap("Not permitted");
+    }
 
     let res: CallResult<((),)> = ic_cdk::api::call::call(_initializer(), "upgrade_proxies", ()).await;
     res.expect("Failed to call 'upgrade_proxies' to Initializer");

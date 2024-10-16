@@ -491,7 +491,10 @@ fn post_upgrade() {
     let config = get_indexing_config();
     if config.task_interval_secs > 0 {
         // If the timer was already started, set the timer again at the time of upgrade.
-        start_indexing_internal(config);
+        start_indexing_internal(IndexingConfig {
+            delay_secs: Some(1), // inter-canister call cannot be executed in init/post_upgrade
+            ..config
+        });
     }
 }
 

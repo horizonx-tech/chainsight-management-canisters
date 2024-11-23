@@ -180,7 +180,7 @@ shared ({ caller = owner }) actor class RegistryCanister() = this {
         // Pre-load 300 billion cycles for the creation of a new Service canister
         // Note that canister creation costs 100 billion cycles, meaning there are 200 billion
         // left over for the new canister when it is created
-        Cycles.add(300_000_000_000);
+        Cycles.add(500_000_000_000);
         let newServiceCanister = await DB.DB({
             partitionKey = pk;
             scalingOptions = {

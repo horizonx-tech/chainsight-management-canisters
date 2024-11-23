@@ -267,7 +267,7 @@ async fn create_new_canister_with_deposit(
 }
 
 async fn create_new_canister(subnet: Option<Principal>) -> CallResult<Principal> {
-    let cycles = 100_000_000_000u128; // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+    let cycles = 500_000_000_000u128; // NOTE: from https://internetcomputer.org/docs/current/developer-docs/gas-cost#cycles-price-breakdown
 
     if subnet.is_none() {
         let result = create_canister(CreateCanisterArgument { settings: None }, cycles)

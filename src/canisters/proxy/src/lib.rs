@@ -247,7 +247,7 @@ async fn list_logs(target: Principal, from: Int, to: Int) -> Vec<CallLog> {
 async fn proxy_call(method: String, args: Vec<u8>) -> CallResult<(Vec<u8>,)> {
     let caller = ic_cdk::caller();
     let result = _proxy_call(caller, method, args).await;
-    _put_call_log(caller).await;
+    // _put_call_log(caller).await;
     result
 }
 

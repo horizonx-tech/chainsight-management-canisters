@@ -65,6 +65,8 @@ async fn initialize(
     }
 
     let principal = ic_cdk::caller();
+    // not in use
+    let db = Principal::anonymous();
 
     let vault = create_new_canister_with_deposit(cycles.vault_intial_supply, subnet)
         .await
@@ -77,54 +79,20 @@ async fn initialize(
         .await
         .unwrap();
 
-    let db = create_new_canister_with_deposit(cycles.db.initial_supply, subnet)
-        .await
-        .unwrap_or_else(|e| {
-            panic!(
-                "{} err = {:?}",
-                format!(
-                    "Failed to deploy db. deployed canisters: vault = {:?}",
-                    vault.to_text()
-                ),
-                e
-            )
-        });
-    let err_msg = format!(
-        "Failed to initialize db. deployed canisters: vault = {:?}, db = {:?}",
-        vault.to_text(),
-        db.to_text()
-    );
-    update_controllers_for_canister(&db, controllers)
-        .await
-        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
-    install_db(db)
-        .await
-        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
-    ic_cdk::println!(
-        "DB of {:?} installed at {:?}",
-        principal.to_string(),
-        db.to_string()
-    );
-    init_db(db)
-        .await
-        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
-
     let proxy = create_new_canister_with_deposit(cycles.proxy.initial_supply, subnet)
         .await
         .unwrap_or_else(|_| {
             panic!(
                 "{}",
                 &format!(
-                    "Failed to deploy proxy. deployed canisters: vault = {:?}, db = {:?}",
+                    "Failed to deploy proxy. deployed canisters: vault = {:?}",
                     vault.to_text(),
-                    db.to_text()
                 )
             )
         });
     let err_msg = format!(
-        "Failed to initialize proxy. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}",
+        "Failed to initialize proxy. deployed canisters: vault = {:?}, proxy = {:?}",
         vault.to_text(),
-        db.to_text(),
         proxy.to_text()
     );
     update_controllers_for_canister(&proxy, controllers)
@@ -140,12 +108,11 @@ async fn initialize(
     );
 
     let err_msg = format!(
-        "Failed to initialize vault. deployed canisters: vault = {:?}, db = {:?}, proxy = {:?}",
+        "Failed to initialize vault. deployed canisters: vault = {:?}, proxy = {:?}",
         vault.to_text(),
-        db.to_text(),
         proxy.to_text()
     );
-    install_vault(&vault, &principal, &db, &proxy, &deployer, &cycles)
+    install_vault(&vault, &principal, &proxy, &deployer, &cycles)
         .await
         .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     register_canister_of_registry(principal, vault)
@@ -163,7 +130,6 @@ async fn initialize(
 async fn install_vault(
     created: &Principal,
     indexer: &Principal,
-    db: &Principal,
     proxy: &Principal,
     deployer: &Principal,
     cycles: &CycleManagements,
@@ -184,11 +150,6 @@ async fn install_vault(
                     threshold: cycles.indexer.refueling_threshold,
                 },
                 RefuelTarget {
-                    id: db.clone(),
-                    amount: cycles.db.refueling_amount,
-                    threshold: cycles.db.refueling_threshold,
-                },
-                RefuelTarget {
                     id: proxy.clone(),
                     amount: cycles.proxy.refueling_amount,
                     threshold: cycles.proxy.refueling_threshold,
@@ -196,7 +157,6 @@ async fn install_vault(
             ],
             vec![
                 (indexer.clone(), cycles.indexer.initial_supply),
-                (db.clone(), cycles.db.initial_supply),
                 (proxy.clone(), cycles.proxy.initial_supply),
             ],
         ))
@@ -267,7 +227,7 @@ async fn create_new_canister_with_deposit(
 }
 
 async fn create_new_canister(subnet: Option<Principal>) -> CallResult<Principal> {
-    let cycles = 100_000_000_000u128; // NOTE: from https://github.com/dfinity/cdk-rs/blob/a8454cb37420c200c7b224befd6f68326a01442e/src/ic-cdk/src/api/management_canister/main/mod.rs#L17-L32
+    let cycles = 500_000_000_000u128; // NOTE: from https://internetcomputer.org/docs/current/developer-docs/gas-cost#cycles-price-breakdown
 
     if subnet.is_none() {
         let result = create_canister(CreateCanisterArgument { settings: None }, cycles)

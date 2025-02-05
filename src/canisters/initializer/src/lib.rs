@@ -229,41 +229,41 @@ async fn create_new_canister_with_deposit(
 async fn create_new_canister(subnet: Option<Principal>) -> CallResult<Principal> {
     let cycles = 500_000_000_000u128; // NOTE: from https://internetcomputer.org/docs/current/developer-docs/gas-cost#cycles-price-breakdown
 
-    if subnet.is_none() {
-        let result = create_canister(CreateCanisterArgument { settings: None }, cycles)
-            .await?
-            .0;
-        let canister_id = result.canister_id;
-        return Ok(canister_id);
-    }
-
-    let result = cmc()
-        .create_canister(
-            CreateCanisterArg {
-                subnet_selection: Some(SubnetSelection::Subnet {
-                    subnet: subnet.unwrap(),
-                }),
-                settings: None,
-                subnet_type: None,
-            },
-            cycles,
-        )
+    // if subnet.is_none() {
+    let result = create_canister(CreateCanisterArgument { settings: None }, cycles)
         .await?
         .0;
-    match result {
-        CreateCanisterResult::Ok(canister_id) => Ok(canister_id),
-        CreateCanisterResult::Err(err) => match err {
-            cmc::types::CreateCanisterError::Refunded {
-                create_error,
-                refund_amount,
-            } => {
-                ic_cdk::trap(&format!(
-                    "Failed to create canister: {:?}, refunded amount: {:?}",
-                    create_error, refund_amount
-                ));
-            }
-        },
-    }
+    let canister_id = result.canister_id;
+    return Ok(canister_id);
+    // }
+
+    // let result = cmc()
+    //     .create_canister(
+    //         CreateCanisterArg {
+    //             subnet_selection: Some(SubnetSelection::Subnet {
+    //                 subnet: subnet.unwrap(),
+    //             }),
+    //             settings: None,
+    //             subnet_type: None,
+    //         },
+    //         cycles,
+    //     )
+    //     .await?
+    //     .0;
+    // match result {
+    //     CreateCanisterResult::Ok(canister_id) => Ok(canister_id),
+    //     CreateCanisterResult::Err(err) => match err {
+    //         cmc::types::CreateCanisterError::Refunded {
+    //             create_error,
+    //             refund_amount,
+    //         } => {
+    //             ic_cdk::trap(&format!(
+    //                 "Failed to create canister: {:?}, refunded amount: {:?}",
+    //                 create_error, refund_amount
+    //             ));
+    //         }
+    //     },
+    // }
 }
 
 async fn register_canister_of_registry(principal: Principal, vault: Principal) -> CallResult<()> {

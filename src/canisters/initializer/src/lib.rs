@@ -115,9 +115,6 @@ async fn initialize(
     install_vault(&vault, &principal, &proxy, &deployer, &cycles)
         .await
         .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
-    register_canister_of_registry(principal, vault)
-        .await
-        .unwrap_or_else(|e| panic!("{} err = {:?}", &err_msg, e));
     ic_cdk::println!(
         "Vault of {:?} installed at {:?}",
         principal.to_string(),
@@ -264,11 +261,6 @@ async fn create_new_canister(subnet: Option<Principal>) -> CallResult<Principal>
     //         }
     //     },
     // }
-}
-
-async fn register_canister_of_registry(principal: Principal, vault: Principal) -> CallResult<()> {
-    let reg = get_registry();
-    ic_cdk::api::call::call(reg, "registerCanister", (principal, vault)).await
 }
 
 #[update]
